@@ -375,7 +375,7 @@ void PoseidonGoldilocks::merkletree(Goldilocks::Element *tree, Goldilocks::Eleme
 }
 void PoseidonGoldilocks::merkletree_batch(Goldilocks::Element *tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, uint64_t batch_size, uint64_t dim)
 {
-    if (num_rows == 0 || num_cols == 0)
+    if (num_rows == 0)
     {
         return;
     }
@@ -385,8 +385,11 @@ void PoseidonGoldilocks::merkletree_batch(Goldilocks::Element *tree, Goldilocks:
     int numThreads = omp_get_max_threads() / 2;
     Goldilocks::parcpy(&tree[MERKLEHASHGOLDILOCKS_HEADER_SIZE], input, dim * num_cols * num_rows, numThreads);
     Goldilocks::Element *cursor = &tree[MERKLEHASHGOLDILOCKS_HEADER_SIZE + num_cols * num_rows * dim];
-
-    uint64_t nbatches = (num_cols + batch_size - 1) / batch_size;
+    uint64_t nbatches = 1;
+    if (num_cols > 0)
+    {
+        nbatches = (num_cols + batch_size - 1) / batch_size;
+    }
     uint64_t nlastb = num_cols - (nbatches - 1) * batch_size;
 
 #pragma omp parallel for

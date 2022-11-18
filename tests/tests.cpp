@@ -1095,7 +1095,7 @@ TEST(GOLDILOCKS_TEST, merkle_tree_part)
     ncols_hash = 0;
     nrows_hash = (1 << 6);
 
-    numElementsTree = MerklehashGoldilocks::getTreeNumElements(ncols_hash, nrows_hash);
+    /*numElementsTree = MerklehashGoldilocks::getTreeNumElements(ncols_hash, nrows_hash);
     tree = (Goldilocks::Element *)malloc(numElementsTree * sizeof(Goldilocks::Element));
     cols = NULL;
     PoseidonGoldilocks::merkletree_batch(tree, cols, ncols_hash, nrows_hash, batch_size);
@@ -1106,7 +1106,7 @@ TEST(GOLDILOCKS_TEST, merkle_tree_part)
     ASSERT_EQ(Goldilocks::toU64(root[2]), 0x177);
     ASSERT_EQ(Goldilocks::toU64(root[3]), 0X17A);
 
-    free(tree);
+    free(tree);*/
 }
 
 TEST(GOLDILOCKS_TEST, ntt)
