@@ -16,13 +16,13 @@
 
 #define NUM_HASHES 10000
 
-#define FFT_SIZE (1 << 23)
+#define FFT_SIZE (1 << 20)
 #define NUM_COLUMNS 100
 #define BLOWUP_FACTOR 1
 #define NPHASES_NTT 2
 #define NPHASES_LDE 2
 #define NBLOCKS 1
-#define NCOLS_HASH 100
+#define NCOLS_HASH 128
 #define NROWS_HASH FFT_SIZE
 
 static void POSEIDON_BENCH_FULL(benchmark::State &state)
@@ -382,6 +382,47 @@ static void MERKLE_TREE_BENCH_AVX(benchmark::State &state)
     state.counters["BytesProcessed"] = benchmark::Counter((uint64_t)NROWS_HASH * (uint64_t)NCOLS_HASH * sizeof(Goldilocks::Element), benchmark::Counter::kIsIterationInvariantRate, benchmark::Counter::OneK::kIs1024);
 }
 
+static void MERKLE_TREE_BENCH_BATCH(benchmark::State &state)
+{
+    Goldilocks::Element *cols = (Goldilocks::Element *)malloc((uint64_t)NCOLS_HASH * (uint64_t)NROWS_HASH * sizeof(Goldilocks::Element));
+
+    // Test vector: Fibonacci series on the columns and increase the initial values to the right,
+    // 1 2 3 4  5  6  ... NUM_COLS
+    // 1 2 3 4  5  6  ... NUM_COLS
+    // 2 4 6 8  10 12 ... NUM_COLS + NUM_COLS
+    // 3 6 9 12 15 18 ... NUM_COLS + NUM_COLS + NUM_COLS
+    for (uint64_t i = 0; i < NCOLS_HASH; i++)
+    {
+        cols[i] = Goldilocks::fromU64(i) + Goldilocks::one();
+        cols[i + NCOLS_HASH] = Goldilocks::fromU64(i) + Goldilocks::one();
+    }
+    for (uint64_t j = 2; j < NROWS_HASH; j++)
+    {
+        for (uint64_t i = 0; i < NCOLS_HASH; i++)
+        {
+            cols[j * NCOLS_HASH + i] = cols[(j - 2) * NCOLS_HASH + i] + cols[(j - 1) * NCOLS_HASH + i];
+        }
+    }
+
+    uint64_t numElementsTree = MerklehashGoldilocks::getTreeNumElements(NCOLS_HASH, NROWS_HASH);
+    Goldilocks::Element *tree = (Goldilocks::Element *)malloc(numElementsTree * sizeof(Goldilocks::Element));
+
+    // Benchmark
+    for (auto _ : state)
+    {
+        PoseidonGoldilocks::merkletree_batch(tree, cols, NCOLS_HASH, NROWS_HASH, state.range(0));
+    }
+    Goldilocks::Element root[4];
+    MerklehashGoldilocks::root(&(root[0]), tree, numElementsTree);
+
+    free(cols);
+    free(tree);
+    // Rate = time to process 1 posseidon per thread
+    // BytesProcessed = total bytes processed per second on every iteration
+    state.counters["Rate"] = benchmark::Counter((((float)NROWS_HASH * (float)ceil((float)NCOLS_HASH / (float)RATE)) + log2(NROWS_HASH)) / state.range(0), benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
+    state.counters["BytesProcessed"] = benchmark::Counter((uint64_t)NROWS_HASH * (uint64_t)NCOLS_HASH * sizeof(Goldilocks::Element), benchmark::Counter::kIsIterationInvariantRate, benchmark::Counter::OneK::kIs1024);
+}
+
 static void NTT_BENCH(benchmark::State &state)
 {
     NTT_Goldilocks gntt(FFT_SIZE, state.range(0));
@@ -547,6 +588,24 @@ static void LDE_BLOCK_BENCH(benchmark::State &state)
     free(r);
 }
 
+BENCHMARK(MERKLE_TREE_BENCH_BATCH)
+    ->Unit(benchmark::kSecond)
+    ->Args({8})
+    ->Args({16})
+    ->Args({32})
+    ->Args({64})
+    ->Args({128})
+    ->UseRealTime();
+
+BENCHMARK(MERKLE_TREE_BENCH_AVX)
+    ->Unit(benchmark::kSecond)
+    ->Args({8})
+    ->Args({16})
+    ->Args({32})
+    ->Args({64})
+    ->Args({128})
+    ->UseRealTime();
+#if 1
 BENCHMARK(POSEIDON_BENCH_FULL)
     ->Unit(benchmark::kMicrosecond)
     //->DenseRange(1, 1, 1)
@@ -654,6 +713,7 @@ BENCHMARK(LDE_BLOCK_BENCH)
     //->DenseRange(omp_get_max_threads() / 2 - 8, omp_get_max_threads() / 2 + 8, 2)
     ->DenseRange(omp_get_max_threads() / 2, omp_get_max_threads() / 2, 1)
     ->UseRealTime();
+#endif
 
 BENCHMARK_MAIN();
 // Build command: g++ benchs/bench.cpp src/* -lbenchmark -lomp -lpthread -lgmp  -std=c++17 -Wall -pthread -fopenmp -mavx2 -L$(find /usr/lib/llvm-* -name "libomp.so" | sed 's/libomp.so//') -O3 -o bench && ./bench
