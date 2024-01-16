@@ -450,6 +450,55 @@ static void MERKLETREE_BENCH(benchmark::State &state)
     delete[] cols;
     delete[] tree;
 }
+#ifdef __USE_CUDA__
+static void MERKLETREE_BENCH_CUDA(benchmark::State &state)
+{
+    Goldilocks::Element *cols = new Goldilocks::Element[(uint64_t)NCOLS_HASH * (uint64_t)NROWS_HASH];
+
+    // Test vector: Fibonacci series on the columns and increase the initial values to the right,
+    // 1 2 3 4  5  6  ... NUM_COLS
+    // 1 2 3 4  5  6  ... NUM_COLS
+    // 2 4 6 8  10 12 ... NUM_COLS + NUM_COLS
+    // 3 6 9 12 15 18 ... NUM_COLS + NUM_COLS + NUM_COLS
+    for (uint64_t i = 0; i < NCOLS_HASH; i++)
+    {
+        cols[i] = Goldilocks::fromU64(i) + Goldilocks::one();
+        cols[i + NCOLS_HASH] = Goldilocks::fromU64(i) + Goldilocks::one();
+    }
+    for (uint64_t j = 2; j < NROWS_HASH; j++)
+    {
+        for (uint64_t i = 0; i < NCOLS_HASH; i++)
+        {
+            cols[j * NCOLS_HASH + i] = cols[(j - 2) * NCOLS_HASH + i] + cols[(j - 1) * NCOLS_HASH + i];
+        }
+    }
+
+    uint64_t numElementsTree = MerklehashGoldilocks::getTreeNumElements(NROWS_HASH);
+    Goldilocks::Element *tree = new Goldilocks::Element[numElementsTree];
+
+    // Benchmark
+    for (auto _ : state)
+    {
+        PoseidonGoldilocks::merkletree_cuda(tree, cols, NCOLS_HASH, NROWS_HASH, state.range(0));
+    }
+    Goldilocks::Element root[4];
+    MerklehashGoldilocks::root(&(root[0]), tree, numElementsTree);
+
+    // check results
+    assert(Goldilocks::toU64(root[0]) == 0Xc935fb33cd86c0b8);
+    assert(Goldilocks::toU64(root[1]) == 0X906753f66aa2791d);
+    assert(Goldilocks::toU64(root[2]) == 0X3f6163b1b58a6ed7);
+    assert(Goldilocks::toU64(root[3]) == 0Xbd575d9ed19d18c2);
+
+    // Rate = time to process 1 linear hash per core
+    // BytesProcessed = total bytes processed per second on every iteration
+    int threads_core = 2 * state.range(0) / omp_get_max_threads(); // we assume hyperthreading
+    state.counters["Rate"] = benchmark::Counter(threads_core * (((double)NROWS_HASH * (double)ceil((double)NCOLS_HASH / (double)RATE)) + log2(NROWS_HASH)) / state.range(0), benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
+    state.counters["BytesProcessed"] = benchmark::Counter((uint64_t)NROWS_HASH * (uint64_t)NCOLS_HASH * sizeof(Goldilocks::Element), benchmark::Counter::kIsIterationInvariantRate, benchmark::Counter::OneK::kIs1024);
+    delete[] cols;
+    delete[] tree;
+}
+#endif  // __USE_CUDA__
 static void MERKLETREE_BENCH_AVX(benchmark::State &state)
 {
     Goldilocks::Element *cols = new Goldilocks::Element[(uint64_t)NCOLS_HASH * (uint64_t)NROWS_HASH];
@@ -941,6 +990,13 @@ BENCHMARK(MERKLETREE_BENCH)
     ->Unit(benchmark::kMicrosecond)
     ->DenseRange(omp_get_max_threads() / 2, omp_get_max_threads(), omp_get_max_threads() / 2)
     ->UseRealTime();
+
+#ifdef __USE_CUDA__
+BENCHMARK(MERKLETREE_BENCH_CUDA)
+    ->Unit(benchmark::kMicrosecond)
+    ->DenseRange(omp_get_max_threads() / 2, omp_get_max_threads(), omp_get_max_threads() / 2)
+    ->UseRealTime();
+#endif
 
 BENCHMARK(MERKLETREE_BENCH_AVX)
     ->Unit(benchmark::kMicrosecond)

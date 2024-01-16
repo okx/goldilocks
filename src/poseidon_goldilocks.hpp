@@ -59,6 +59,10 @@ public:
     void static merkletree_avx(Goldilocks::Element *tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, int nThreads = 0, uint64_t dim = 1);
     void static merkletree_batch_avx(Goldilocks::Element *tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, uint64_t batch_size, int nThreads = 0, uint64_t dim = 1);
 
+#ifdef __USE_CUDA__
+    void static merkletree_cuda(Goldilocks::Element *tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, int nThreads = 0, uint64_t dim = 1);
+#endif
+
 #ifdef __AVX512__
     // Vectorized AVX512:
     void static hash_full_result_avx512(Goldilocks::Element *, const Goldilocks::Element *);
