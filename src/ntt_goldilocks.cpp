@@ -163,7 +163,7 @@ void NTT_Goldilocks::NTT_iters(Goldilocks::Element *dst, Goldilocks::Element *sr
     }
 }
 
-#define NTT_PROFILING
+//#define NTT_PROFILING
 #ifdef NTT_PROFILING
 
 #include <stdio.h>

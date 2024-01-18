@@ -48,7 +48,9 @@ private:
 public:
     NTT_Goldilocks(u_int64_t maxDomainSize, u_int32_t _nThreads = 0, int extension_ = 1)
     {
-
+#ifdef NTT_PROFILING
+	printf("New NTT with maxDomainSize %lu\n", maxDomainSize);
+#endif
         r = NULL;
         r_ = NULL;
         if (maxDomainSize == 0)
