@@ -163,6 +163,48 @@ void NTT_Goldilocks::NTT_iters(Goldilocks::Element *dst, Goldilocks::Element *sr
     }
 }
 
+#define NTT_PROFILING
+#ifdef NTT_PROFILING
+
+#include <stdio.h>
+
+static int ifcnt = 0;  // inputs file counter
+static int ofcnt = 0;  // outputs file counter
+
+void write_binary_file(char* prefix, int* fcnt, Goldilocks::Element* data, size_t nelements,
+                        uint64_t p1, uint64_t p2, uint64_t p3, uint64_t p4, uint64_t p5, uint64_t p6) {
+    char fname[32];
+    sprintf(fname, "%s-%d.bin", prefix, *fcnt);
+    *fcnt = *fcnt + 1;
+
+    FILE *f = fopen(fname, "wb");
+    assert(f != NULL);
+    assert (1 == fwrite(&p1, sizeof(Goldilocks::Element), 1, f));
+    assert (1 == fwrite(&p2, sizeof(Goldilocks::Element), 1, f));
+    assert (1 == fwrite(&p3, sizeof(Goldilocks::Element), 1, f));
+    assert (1 == fwrite(&p4, sizeof(Goldilocks::Element), 1, f));
+    assert (1 == fwrite(&p5, sizeof(Goldilocks::Element), 1, f));
+    assert (1 == fwrite(&p6, sizeof(Goldilocks::Element), 1, f));
+
+    const size_t write_size = 4096;
+    const size_t write_elements = write_size / sizeof(Goldilocks::Element);
+    size_t idx = 0;
+    while (nelements >= write_elements) {
+        size_t n = fwrite(data + idx, sizeof(Goldilocks::Element), write_elements, f);
+        assert(n == write_elements);
+        idx += write_elements;
+        nelements -= write_elements;
+    }
+    if (nelements > 0) {
+        size_t n = fwrite(data + idx, sizeof(Goldilocks::Element), nelements, f);
+        assert(n == nelements);
+    }
+
+    fclose(f);
+}
+
+#endif // NTT_PROFILING
+
 void NTT_Goldilocks::NTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock, bool inverse, bool extend)
 {
     if (ncols == 0 || size == 0)
@@ -177,6 +219,13 @@ void NTT_Goldilocks::NTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_i
     {
         nblock = ncols;
     }
+
+#ifdef NTT_PROFILING
+    if (size >= (1 << 20)) {
+        write_binary_file((char*)"ntt_src", &ifcnt, src, size * ncols, size, ncols, nphase, nblock, inverse, extend);
+        printf("Input %d Buffer %p\n", ifcnt, (void*)buffer);
+    }
+#endif
 
     u_int64_t offset_cols = 0;
     u_int64_t ncols_block = ncols / nblock;
@@ -229,6 +278,11 @@ void NTT_Goldilocks::NTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_i
     {
         free(aux);
     }
+#ifdef NTT_PROFILING
+    if (size >= (1 << 20)) {
+        write_binary_file((char*)"ntt_dst", &ofcnt, src, size * ncols, size, ncols, nphase, nblock, inverse, extend);
+    }
+#endif
 }
 /**
  * @brief permutation of components of an array in bit-reversal order. If dst==src the permutation is performed on-site.
