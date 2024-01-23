@@ -4,6 +4,8 @@
 #include "poseidon_goldilocks.hpp"
 #include "merklehash_goldilocks.hpp"
 
+#include <chrono>
+
 typedef uint32_t u32;
 typedef uint64_t u64;
 
@@ -236,7 +238,7 @@ __global__ void hash_gpu(uint32_t nextN, uint32_t nextIndex, uint32_t pending, u
     hash_one((gl64_t *)(&cursor[nextIndex + (pending + tid) * CAPACITY]), pol_input);
 }
 
-void merkletree_cuda_batch(Goldilocks::Element *tree, uint64_t *gpu_tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, uint64_t dim, uint32_t const gpu_id)
+void merkletree_cuda_batch(Goldilocks::Element *tree, uint64_t* dst_gpu_tree, uint64_t *gpu_tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, uint64_t dim, uint32_t const gpu_id)
 {
     cudaStream_t gpu_stream;
     CHECKCUDAERR(cudaSetDevice(gpu_id));
@@ -270,26 +272,54 @@ void merkletree_cuda_batch(Goldilocks::Element *tree, uint64_t *gpu_tree, Goldil
     uint64_t *gtree_ptr = gpu_tree;
     for (uint32_t b = 0; b < batches; b++)
     {
-        CHECKCUDAERR(cudaMemcpyAsync(gpu_input, (uint64_t *)iptr, rowsBatch * num_cols * dim * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream));
+        auto startTime = std::chrono::high_resolution_clock::now();
+        CHECKCUDAERR(cudaMemcpy(gpu_input, (uint64_t *)iptr, rowsBatch * num_cols * dim * sizeof(uint64_t), cudaMemcpyHostToDevice));
+        CHECKCUDAERR(cudaStreamSynchronize(gpu_stream));
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+        std::cout << "Memcpy H->D of size: " << rowsBatch * num_cols * dim * sizeof(uint64_t) << " time (nanoseconds): " << elapsedTime << std::endl;
+
         iptr += (rowsBatch * num_cols * dim);
         // here rows should be >> TPB
+        startTime = std::chrono::high_resolution_clock::now();
         linear_hash_gpu<<<ceil(rowsBatch / (1.0 * TPB)), TPB, 0, gpu_stream>>>(gtree_ptr, gpu_input, num_cols * dim, rowsBatch);
+        CHECKCUDAERR(cudaStreamSynchronize(gpu_stream));
+        endTime = std::chrono::high_resolution_clock::now();
+        elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+        std::cout << "Kernel linear_hash_gpu time (nanoseconds): " << elapsedTime << std::endl;
         gtree_ptr += (rowsBatch * CAPACITY);
     }
     if (rowsLastBatch > 0)
     {
-        CHECKCUDAERR(cudaMemcpyAsync(gpu_input, (uint64_t *)iptr, rowsLastBatch * num_cols * dim * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream));
-        // here rows should be >> TPB
+        auto startTime = std::chrono::high_resolution_clock::now();
+        CHECKCUDAERR(cudaMemcpy(gpu_input, (uint64_t *)iptr, rowsLastBatch * num_cols * dim * sizeof(uint64_t), cudaMemcpyHostToDevice));
+        CHECKCUDAERR(cudaStreamSynchronize(gpu_stream));
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+        std::cout << "Memcpy H->D of size: " << rowsLastBatch * num_cols * dim * sizeof(uint64_t) << " time (nanoseconds): " << elapsedTime << std::endl;
+        
+        startTime = std::chrono::high_resolution_clock::now();
         linear_hash_gpu<<<ceil(rowsLastBatch / (1.0 * TPB)), TPB, 0, gpu_stream>>>(gtree_ptr, gpu_input, num_cols * dim, rowsLastBatch);
+        CHECKCUDAERR(cudaStreamSynchronize(gpu_stream));
+        endTime = std::chrono::high_resolution_clock::now();
+        elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+        std::cout << "Kernel linear_hash_gpu time (nanoseconds): " << elapsedTime << std::endl;
     }
-
-    CHECKCUDAERR(cudaMemcpyAsync(tree, gpu_tree, numElementsTree * sizeof(uint64_t), cudaMemcpyDeviceToHost, gpu_stream));
+    
+    if (dst_gpu_tree != NULL)
+    {
+        auto startTime = std::chrono::high_resolution_clock::now();
+        CHECKCUDAERR(cudaMemcpyPeer(dst_gpu_tree, 0, gpu_tree, gpu_id, numElementsTree * sizeof(uint64_t)));
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+        std::cout << "Memcpy D->D of size: " << rowsLastBatch * num_cols * dim * sizeof(uint64_t) << " time (nanoseconds): " << elapsedTime << std::endl;
+    }
     CHECKCUDAERR(cudaStreamSynchronize(gpu_stream));
     CHECKCUDAERR(cudaFree(gpu_input));
     CHECKCUDAERR(cudaStreamDestroy(gpu_stream));
 }
 
-void merkletree_cuda_multi_gpu(Goldilocks::Element *tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, int nThreads, uint64_t dim, uint32_t const ngpu)
+void merkletree_cuda_multi_gpu(Goldilocks::Element *tree, uint64_t* dst_gpu_tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, int nThreads, uint64_t dim, uint32_t const ngpu)
 {
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
@@ -325,7 +355,7 @@ void merkletree_cuda_multi_gpu(Goldilocks::Element *tree, Goldilocks::Element *i
         {
             CHECKCUDAERR(cudaSetDevice(d));
             CHECKCUDAERR(cudaMalloc(&gpu_tree[d], numElementsTreeDevice * sizeof(uint64_t)));
-            merkletree_cuda_batch(tree + (d * numElementsTreeDevice), gpu_tree[d], input + (d * rowsDevice * num_cols * dim), num_cols, rowsDevice, dim, d);
+            merkletree_cuda_batch(tree + (d * numElementsTreeDevice), dst_gpu_tree + (d * numElementsTreeDevice), gpu_tree[d], input + (d * rowsDevice * num_cols * dim), num_cols, rowsDevice, dim, d);
         }
 
 #pragma omp parallel for
@@ -344,16 +374,33 @@ void merkletree_cuda_multi_gpu(Goldilocks::Element *tree, Goldilocks::Element *i
             CHECKCUDAERR(cudaMalloc(&gpu_tree[d], numElementsTreeDevice * sizeof(uint64_t)));
             CHECKCUDAERR(cudaMalloc(&gpu_input[d], rowsDevice * num_cols * dim * sizeof(uint64_t)));
             CHECKCUDAERR(cudaStreamCreate(gpu_stream + d));
-            CHECKCUDAERR(cudaMemcpyAsync(gpu_input[d], (uint64_t *)(input + d * rowsDevice * num_cols * dim), rowsDevice * num_cols * dim * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[d]));
-            // here rowsDevice should be >> TPB
-            linear_hash_gpu<<<ceil(rowsDevice / (1.0 * TPB)), TPB, 0, gpu_stream[d]>>>(gpu_tree[d], gpu_input[d], num_cols * dim, rowsDevice);
-            CHECKCUDAERR(cudaMemcpyAsync(tree + (d * numElementsTreeDevice), gpu_tree[d], numElementsTreeDevice * sizeof(uint64_t), cudaMemcpyDeviceToHost, gpu_stream[d]));
+
+            auto startTime = std::chrono::high_resolution_clock::now();
+            CHECKCUDAERR(cudaMemcpy(gpu_input[d], (uint64_t *)(input + d * rowsDevice * num_cols * dim), rowsDevice * num_cols * dim * sizeof(uint64_t), cudaMemcpyHostToDevice));
             CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
+            auto endTime = std::chrono::high_resolution_clock::now();
+            auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+            std::cout << "Memcpy H->D of size: " << rowsDevice * num_cols * dim * sizeof(uint64_t) << " time (nanoseconds): " << elapsedTime << std::endl;
+            
+            startTime = std::chrono::high_resolution_clock::now();
+            linear_hash_gpu<<<ceil(rowsDevice / (1.0 * TPB)), TPB, 0, gpu_stream[d]>>>(gpu_tree[d], gpu_input[d], num_cols * dim, rowsDevice);
+            CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
+            endTime = std::chrono::high_resolution_clock::now();
+            elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+            std::cout << "Kernel linear_hash_gpu time (nanoseconds): " << elapsedTime << std::endl;
+
+            startTime = std::chrono::high_resolution_clock::now();
+            CHECKCUDAERR(cudaMemcpyPeer(dst_gpu_tree + (d * numElementsTreeDevice), 0, gpu_tree[d], d, numElementsTreeDevice * sizeof(uint64_t)));
+            CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
+            endTime = std::chrono::high_resolution_clock::now();
+            elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+            std::cout << "Memcpy D->D of size: " << numElementsTreeDevice * sizeof(uint64_t) << " time (nanoseconds): " << elapsedTime << std::endl;
         }
 
 #pragma omp parallel for
         for (uint32_t d = 0; d < ngpu; d++)
         {
+            CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
             CHECKCUDAERR(cudaSetDevice(d));
             CHECKCUDAERR(cudaStreamDestroy(gpu_stream[d]));
             CHECKCUDAERR(cudaFree(gpu_input[d]));
@@ -393,20 +440,19 @@ void PoseidonGoldilocks::merkletree_cuda(Goldilocks::Element *tree, Goldilocks::
     // is the input > 1 GB?
     if (num_rows * num_cols * dim > 134217728)
     {
-        int nDevices;
+        int nDevices = 4;
         cudaGetDeviceCount(&nDevices);
         if (nDevices > 1)
         {
-            merkletree_cuda_multi_gpu(tree, input, num_cols, num_rows, nThreads, dim, nDevices);
             CHECKCUDAERR(cudaSetDevice(0));
             CHECKCUDAERR(cudaMalloc(&gpu_tree, numElementsTree * sizeof(uint64_t)));
-            CHECKCUDAERR(cudaMemcpy(gpu_tree, tree, num_rows * CAPACITY * sizeof(uint64_t), cudaMemcpyHostToDevice));
+            merkletree_cuda_multi_gpu(tree, gpu_tree, input, num_cols, num_rows, nThreads, dim, nDevices);                        
         }
         else
         {
             CHECKCUDAERR(cudaSetDevice(0));
             CHECKCUDAERR(cudaMalloc(&gpu_tree, numElementsTree * sizeof(uint64_t)));
-            merkletree_cuda_batch(tree, gpu_tree, input, num_cols, num_rows, dim, 0);
+            merkletree_cuda_batch(tree, NULL, gpu_tree, input, num_cols, num_rows, dim, 0);
         }
     }
     else
@@ -418,13 +464,23 @@ void PoseidonGoldilocks::merkletree_cuda(Goldilocks::Element *tree, Goldilocks::
         uint64_t *gpu_input;
         CHECKCUDAERR(cudaMalloc(&gpu_tree, numElementsTree * sizeof(uint64_t)));
         CHECKCUDAERR(cudaMalloc(&gpu_input, num_rows * num_cols * dim * sizeof(uint64_t)));
-        CHECKCUDAERR(cudaMemcpyAsync(gpu_input, (uint64_t *)input, num_rows * num_cols * dim * sizeof(uint64_t), cudaMemcpyHostToDevice));
+
+        auto startTime = std::chrono::high_resolution_clock::now();
+        CHECKCUDAERR(cudaMemcpy(gpu_input, (uint64_t *)input, num_rows * num_cols * dim * sizeof(uint64_t), cudaMemcpyHostToDevice));        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+        std::cout << "Memcpy H->D of size: " << num_rows * num_cols * dim * sizeof(uint64_t) << " time (nanoseconds): " << elapsedTime << std::endl;
+
         if (num_rows < TPB)
         {
             actual_tpb = num_rows;
             actual_blks = 1;
         }
+        startTime = std::chrono::high_resolution_clock::now();
         linear_hash_gpu<<<actual_blks, actual_tpb>>>(gpu_tree, gpu_input, num_cols * dim, num_rows);
+        endTime = std::chrono::high_resolution_clock::now();
+        elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+        std::cout << "Kernel linear_hash_gpu time (nanoseconds): " << elapsedTime << std::endl;
         CHECKCUDAERR(cudaFree(gpu_input));
     }
 
@@ -444,11 +500,22 @@ void PoseidonGoldilocks::merkletree_cuda(Goldilocks::Element *tree, Goldilocks::
             actual_tpb = TPB;
             actual_blks = nextN / TPB + 1;
         }
+        auto startTime = std::chrono::high_resolution_clock::now();
         hash_gpu<<<actual_blks, actual_tpb>>>(nextN, nextIndex, pending, gpu_tree);
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+        std::cout << "Kernel hash_gpu time (nanoseconds): " << elapsedTime << std::endl;
+
         nextIndex += pending * CAPACITY;
         pending = pending / 2;
         nextN = floor((pending - 1) / 2) + 1;
     }
+
+    auto startTime = std::chrono::high_resolution_clock::now();
     CHECKCUDAERR(cudaMemcpy(tree, gpu_tree, numElementsTree * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+    std::cout << "Memcpy D->H of size: " << numElementsTree * sizeof(uint64_t) << " time (nanoseconds): " << elapsedTime << std::endl;
+
     CHECKCUDAERR(cudaFree(gpu_tree));
 }
