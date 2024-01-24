@@ -7,8 +7,8 @@
 #include "../src/ntt_goldilocks.hpp"
 #include "../src/merklehash_goldilocks.hpp"
 #include <immintrin.h>
-#include "../cryptography_cuda/src/lib.h"
-#include "../cryptography_cuda/cuda/ntt/ntt.h"
+//#include "../cryptography_cuda/src/lib.h"
+//#include "../cryptography_cuda/cuda/ntt/ntt.h"
 
 #define FFT_SIZE (1 << 23)
 #define NUM_REPS 5
