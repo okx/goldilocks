@@ -170,6 +170,10 @@ public:
     {
         return roots[idx << (s - domainPow)];
     }
+    inline uint32_t get_s()
+    {
+        return s;
+    }
     void extendPol(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, u_int64_t nblock = NUM_BLOCKS);
 };
 
