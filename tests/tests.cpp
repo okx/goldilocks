@@ -8,9 +8,9 @@
 #include "../src/merklehash_goldilocks.hpp"
 #include <immintrin.h>
 
-#define FFT_SIZE (1 << 4)
+#define FFT_SIZE (1 << 32)
 #define NUM_REPS 5
-#define BLOWUP_FACTOR 1
+#define BLOWUP_FACTOR 2
 #define NUM_COLUMNS 8
 #define NPHASES 4
 #define NCOLS_HASH 128
