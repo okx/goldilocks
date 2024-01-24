@@ -7,6 +7,8 @@
 #include "../src/ntt_goldilocks.hpp"
 #include "../src/merklehash_goldilocks.hpp"
 #include <immintrin.h>
+#include "../cryptography_cuda/src/lib.h"
+#include "../cryptography_cuda/cuda/ntt/ntt.h"
 
 #define FFT_SIZE (1 << 23)
 #define NUM_REPS 5
@@ -2643,7 +2645,9 @@ TEST(GOLDILOCKS_TEST, extendePol_cpu)
         }
     }
 
-    ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, b);
+    ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, b, 1);
+
+    //compute_ntt(0, a, 23, Ntt_Types::NN, )
 
     ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-4) * NUM_COLUMNS]), 0X97FACF1FAD53863F);
     ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-3) * NUM_COLUMNS]), 0X629DBA77EEE23EB8);
@@ -2710,6 +2714,8 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
             a[i * NUM_COLUMNS + j] = a[NUM_COLUMNS * (i - 1) + j] + a[NUM_COLUMNS * (i - 2) + j];
         }
     }
+
+
 
     ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, b);
 
