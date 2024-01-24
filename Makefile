@@ -81,7 +81,7 @@ runtestsgpu: testsgpu
 	./testsgpu --gtest_filter=GOLDILOCKS_TEST.merkletree_cuda
 
 runnttcpu: testscpu
-	./testscpu --gtest_filter=GOLDILOCKS_TEST.extendePol
+	./testscpu --gtest_filter=GOLDILOCKS_TEST.extendePol_cpu
 
 runnttgpu: testsgpu
 	./testscpu --gtest_filter=GOLDILOCKS_TEST.extendePol_cuda

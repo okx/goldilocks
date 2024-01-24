@@ -8,7 +8,7 @@
 #include "../src/merklehash_goldilocks.hpp"
 #include <immintrin.h>
 
-#define FFT_SIZE (1 << 32)
+#define FFT_SIZE (1 << 23)
 #define NUM_REPS 5
 #define BLOWUP_FACTOR 2
 #define NUM_COLUMNS 8
@@ -2619,7 +2619,7 @@ TEST(GOLDILOCKS_TEST, LDE_block)
     free(a);
     free(r);
 }
-TEST(GOLDILOCKS_TEST, extendePol)
+TEST(GOLDILOCKS_TEST, extendePol_cpu)
 {
 
     Goldilocks::Element *a = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
