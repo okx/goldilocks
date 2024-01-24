@@ -66,7 +66,7 @@ testscpu: tests/tests.cpp $(ALLSRCS)
 	$(CXX) tests/tests.cpp src/*.cpp -lgtest -lgmp -g -Wall -pthread -fopenmp -mavx2 -o $@
 
 testsgpu: tests/tests.cpp $(ALLSRCS)
-	$(NVCC) -D__USE_CUDA__ -Xcompiler tests/tests.cpp -fPIC -g -Wall -pthread -fopenmp -mavx2 -c -Icryptography_cuda/cuda -o tests.o
+	$(CXX) -D__USE_CUDA__ -Xcompiler tests/tests.cpp -fPIC -g -Wall -pthread -fopenmp -mavx2 -c -Icryptography_cuda/cuda -o tests.o
 	$(CXX) src/goldilocks_base_field.cpp -fPIC -g -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_base_field.o
 	$(CXX) src/goldilocks_cubic_extension.cpp -fPIC -g -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_cubic_extension.o
 	$(CXX) src/ntt_goldilocks.cpp -fPIC  -g -Wall -pthread -fopenmp -mavx2 -c -o ntt_goldilocks.o
