@@ -342,7 +342,7 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
         computeR(N);
     }
 
-    INTT(output, input, N, ncols, tmp, nphase, nblock, false);
+    INTT(output, input, N, ncols, tmp, nphase, nblock, true);
     ntt_extension.NTT(output, output, N_Extended, ncols, tmp, nphase, nblock);
 
     if (buffer == NULL)
