@@ -80,6 +80,12 @@ runtestscpu: testscpu
 runtestsgpu: testsgpu
 	./testsgpu --gtest_filter=GOLDILOCKS_TEST.merkletree_cuda
 
+runnttcpu: testscpu
+	./testscpu --gtest_filter=GOLDILOCKS_TEST.extendePol
+
+runnttgpu: testsgpu
+	./testscpu --gtest_filter=GOLDILOCKS_TEST.extendePol_cuda
+
 benchcpu: benchs/bench.cpp $(ALLSRCS)
 	$(CXX) benchs/bench.cpp src/*.cpp -lbenchmark -lpthread -lgmp  -std=c++17 -Wall -pthread -fopenmp -mavx2 -O3 -o $@
 

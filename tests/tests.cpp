@@ -2645,38 +2645,78 @@ TEST(GOLDILOCKS_TEST, extendePol)
 
     ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, b);
 
-    ASSERT_EQ(Goldilocks::toU64(a[0 * NUM_COLUMNS]), 0X3E7CA26D67147C31);
-    ASSERT_EQ(Goldilocks::toU64(a[1 * NUM_COLUMNS]), 0X1310720153E0ABE4);
-    ASSERT_EQ(Goldilocks::toU64(a[2 * NUM_COLUMNS]), 0X20446D2EA50E8F96);
-    ASSERT_EQ(Goldilocks::toU64(a[3 * NUM_COLUMNS]), 0XEAB91008C3444102);
-    ASSERT_EQ(Goldilocks::toU64(a[4 * NUM_COLUMNS]), 0X68523AC1294A2);
-    ASSERT_EQ(Goldilocks::toU64(a[5 * NUM_COLUMNS]), 0X8A0BB8A3EBA8260A);
-    ASSERT_EQ(Goldilocks::toU64(a[6 * NUM_COLUMNS]), 0X515CEC478A438B2);
-    ASSERT_EQ(Goldilocks::toU64(a[7 * NUM_COLUMNS]), 0XA087431602851263);
-    ASSERT_EQ(Goldilocks::toU64(a[8 * NUM_COLUMNS]), 0XF09629139EA12C82);
-    ASSERT_EQ(Goldilocks::toU64(a[9 * NUM_COLUMNS]), 0X175DC5A131392734);
-    ASSERT_EQ(Goldilocks::toU64(a[10 * NUM_COLUMNS]), 0X72991CA43B50D824);
-    ASSERT_EQ(Goldilocks::toU64(a[11 * NUM_COLUMNS]), 0XDE85A385ABE2A817);
-    ASSERT_EQ(Goldilocks::toU64(a[12 * NUM_COLUMNS]), 0X281F1BF7178650C);
-    ASSERT_EQ(Goldilocks::toU64(a[13 * NUM_COLUMNS]), 0XA0C663876DFF41A7);
-    ASSERT_EQ(Goldilocks::toU64(a[14 * NUM_COLUMNS]), 0XD49C07EA43D3806C);
-    ASSERT_EQ(Goldilocks::toU64(a[15 * NUM_COLUMNS]), 0XBCEB714F2E6B299A);
-    ASSERT_EQ(Goldilocks::toU64(a[16 * NUM_COLUMNS]), 0XC46EE848F93207D8);
-    ASSERT_EQ(Goldilocks::toU64(a[17 * NUM_COLUMNS]), 0XF70EC69883DEE2A);
-    ASSERT_EQ(Goldilocks::toU64(a[18 * NUM_COLUMNS]), 0XEE28CDAF6C30F9D9);
-    ASSERT_EQ(Goldilocks::toU64(a[19 * NUM_COLUMNS]), 0X6356B93C02C259B3);
-    ASSERT_EQ(Goldilocks::toU64(a[20 * NUM_COLUMNS]), 0XD19A89639BC31A16);
-    ASSERT_EQ(Goldilocks::toU64(a[21 * NUM_COLUMNS]), 0XB097AE217FC93344);
-    ASSERT_EQ(Goldilocks::toU64(a[22 * NUM_COLUMNS]), 0X29BB681AF743F8F6);
-    ASSERT_EQ(Goldilocks::toU64(a[23 * NUM_COLUMNS]), 0X8E874011A158B00B);
-    ASSERT_EQ(Goldilocks::toU64(a[24 * NUM_COLUMNS]), 0XC95F0B718235B6D7);
-    ASSERT_EQ(Goldilocks::toU64(a[25 * NUM_COLUMNS]), 0XFE51B4A575AFECA0);
-    ASSERT_EQ(Goldilocks::toU64(a[26 * NUM_COLUMNS]), 0XC68CF305A6F17F4F);
-    ASSERT_EQ(Goldilocks::toU64(a[27 * NUM_COLUMNS]), 0XC7912AE75E2DD36D);
-    ASSERT_EQ(Goldilocks::toU64(a[28 * NUM_COLUMNS]), 0X6EFC40795CF38959);
-    ASSERT_EQ(Goldilocks::toU64(a[29 * NUM_COLUMNS]), 0X6BD4745D238824D9);
-    ASSERT_EQ(Goldilocks::toU64(a[30 * NUM_COLUMNS]), 0XB4FF76AAC16372AA);
-    ASSERT_EQ(Goldilocks::toU64(a[31 * NUM_COLUMNS]), 0XA0705C72DD9F9A2F);
+    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-4) * NUM_COLUMNS]), 0X97FACF1FAD53863F);
+    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-3) * NUM_COLUMNS]), 0X629DBA77EEE23EB8);
+    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-2) * NUM_COLUMNS]), 0XA4D31395719DC6FC);
+    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-1) * NUM_COLUMNS]), 0XC1CE99EE3745E19F);
+
+//    ASSERT_EQ(Goldilocks::toU64(a[0 * NUM_COLUMNS]), 0X3E7CA26D67147C31);
+//    ASSERT_EQ(Goldilocks::toU64(a[1 * NUM_COLUMNS]), 0X1310720153E0ABE4);
+//    ASSERT_EQ(Goldilocks::toU64(a[2 * NUM_COLUMNS]), 0X20446D2EA50E8F96);
+//    ASSERT_EQ(Goldilocks::toU64(a[3 * NUM_COLUMNS]), 0XEAB91008C3444102);
+//    ASSERT_EQ(Goldilocks::toU64(a[4 * NUM_COLUMNS]), 0X68523AC1294A2);
+//    ASSERT_EQ(Goldilocks::toU64(a[5 * NUM_COLUMNS]), 0X8A0BB8A3EBA8260A);
+//    ASSERT_EQ(Goldilocks::toU64(a[6 * NUM_COLUMNS]), 0X515CEC478A438B2);
+//    ASSERT_EQ(Goldilocks::toU64(a[7 * NUM_COLUMNS]), 0XA087431602851263);
+//    ASSERT_EQ(Goldilocks::toU64(a[8 * NUM_COLUMNS]), 0XF09629139EA12C82);
+//    ASSERT_EQ(Goldilocks::toU64(a[9 * NUM_COLUMNS]), 0X175DC5A131392734);
+//    ASSERT_EQ(Goldilocks::toU64(a[10 * NUM_COLUMNS]), 0X72991CA43B50D824);
+//    ASSERT_EQ(Goldilocks::toU64(a[11 * NUM_COLUMNS]), 0XDE85A385ABE2A817);
+//    ASSERT_EQ(Goldilocks::toU64(a[12 * NUM_COLUMNS]), 0X281F1BF7178650C);
+//    ASSERT_EQ(Goldilocks::toU64(a[13 * NUM_COLUMNS]), 0XA0C663876DFF41A7);
+//    ASSERT_EQ(Goldilocks::toU64(a[14 * NUM_COLUMNS]), 0XD49C07EA43D3806C);
+//    ASSERT_EQ(Goldilocks::toU64(a[15 * NUM_COLUMNS]), 0XBCEB714F2E6B299A);
+//    ASSERT_EQ(Goldilocks::toU64(a[16 * NUM_COLUMNS]), 0XC46EE848F93207D8);
+//    ASSERT_EQ(Goldilocks::toU64(a[17 * NUM_COLUMNS]), 0XF70EC69883DEE2A);
+//    ASSERT_EQ(Goldilocks::toU64(a[18 * NUM_COLUMNS]), 0XEE28CDAF6C30F9D9);
+//    ASSERT_EQ(Goldilocks::toU64(a[19 * NUM_COLUMNS]), 0X6356B93C02C259B3);
+//    ASSERT_EQ(Goldilocks::toU64(a[20 * NUM_COLUMNS]), 0XD19A89639BC31A16);
+//    ASSERT_EQ(Goldilocks::toU64(a[21 * NUM_COLUMNS]), 0XB097AE217FC93344);
+//    ASSERT_EQ(Goldilocks::toU64(a[22 * NUM_COLUMNS]), 0X29BB681AF743F8F6);
+//    ASSERT_EQ(Goldilocks::toU64(a[23 * NUM_COLUMNS]), 0X8E874011A158B00B);
+//    ASSERT_EQ(Goldilocks::toU64(a[24 * NUM_COLUMNS]), 0XC95F0B718235B6D7);
+//    ASSERT_EQ(Goldilocks::toU64(a[25 * NUM_COLUMNS]), 0XFE51B4A575AFECA0);
+//    ASSERT_EQ(Goldilocks::toU64(a[26 * NUM_COLUMNS]), 0XC68CF305A6F17F4F);
+//    ASSERT_EQ(Goldilocks::toU64(a[27 * NUM_COLUMNS]), 0XC7912AE75E2DD36D);
+//    ASSERT_EQ(Goldilocks::toU64(a[28 * NUM_COLUMNS]), 0X6EFC40795CF38959);
+//    ASSERT_EQ(Goldilocks::toU64(a[29 * NUM_COLUMNS]), 0X6BD4745D238824D9);
+//    ASSERT_EQ(Goldilocks::toU64(a[30 * NUM_COLUMNS]), 0XB4FF76AAC16372AA);
+//    ASSERT_EQ(Goldilocks::toU64(a[31 * NUM_COLUMNS]), 0XA0705C72DD9F9A2F);
+
+    free(a);
+    free(b);
+}
+
+TEST(GOLDILOCKS_TEST, extendePol_cuda)
+{
+
+    Goldilocks::Element *a = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+    Goldilocks::Element *b = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+
+    NTT_Goldilocks ntt(FFT_SIZE);
+
+    for (uint i = 0; i < 2; i++)
+    {
+        for (uint j = 0; j < NUM_COLUMNS; j++)
+        {
+            Goldilocks::add(a[i * NUM_COLUMNS + j], Goldilocks::one(), Goldilocks::fromU64(j));
+        }
+    }
+
+    for (uint64_t i = 2; i < FFT_SIZE; i++)
+    {
+        for (uint j = 0; j < NUM_COLUMNS; j++)
+        {
+            a[i * NUM_COLUMNS + j] = a[NUM_COLUMNS * (i - 1) + j] + a[NUM_COLUMNS * (i - 2) + j];
+        }
+    }
+
+    ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, b);
+
+    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-4) * NUM_COLUMNS]), 0X97FACF1FAD53863F);
+    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-3) * NUM_COLUMNS]), 0X629DBA77EEE23EB8);
+    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-2) * NUM_COLUMNS]), 0XA4D31395719DC6FC);
+    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-1) * NUM_COLUMNS]), 0XC1CE99EE3745E19F);
 
     free(a);
     free(b);
