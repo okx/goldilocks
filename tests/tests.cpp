@@ -2714,8 +2714,8 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
     }
 
     //ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, b);
-    compute_ntt(0, a, 23, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::coset);
-    compute_ntt(0, a, 24, Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
+    compute_ntt(0, (fr_t *)(uint64_t *)a, 23, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::coset);
+    compute_ntt(0, (fr_t *)(uint64_t *)a, 24, Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
 
     ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-4) * NUM_COLUMNS]), 0X97FACF1FAD53863F);
     ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-3) * NUM_COLUMNS]), 0X629DBA77EEE23EB8);
