@@ -2645,7 +2645,7 @@ TEST(GOLDILOCKS_TEST, extendePol_cpu)
         }
     }
 
-    ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, b, 5);
+    ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, b, 5, 2);
 
     //compute_ntt(0, a, 23, Ntt_Types::NN, )
 
