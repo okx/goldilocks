@@ -10,7 +10,7 @@
 #ifdef __USE_CUDA__
 #include "../cryptography_cuda/src/lib.h"
 #include "../cryptography_cuda/cuda/ntt/ntt.h"
-#endif
+#endif // __USE_CUDA__
 
 #define FFT_SIZE (1 << 23)
 #define NUM_REPS 5
@@ -2727,7 +2727,7 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
     free(a);
     free(b);
 }
-#endif
+#endif // __USE_CUDA__
 TEST(GOLDILOCKS_CUBIC_TEST, one)
 {
     uint64_t a[3] = {1, 1, 1};
