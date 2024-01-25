@@ -7,6 +7,10 @@
 #include <cassert>
 #include <vector>
 
+#ifdef __USE_CUDA__
+void test_goldilocks3_gpu();
+#endif
+
 #define FIELD_EXTENSION 3
 
 /*

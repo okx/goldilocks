@@ -2765,6 +2765,14 @@ TEST(GOLDILOCKS_CUBIC_TEST, one)
     ASSERT_EQ(inc1_res[2], a[2]);
 }
 
+#ifdef __USE_CUDA__
+#include "test_goldilocks_cubic_extension.hpp"
+TEST(GOLDILOCKS_CUBIC_TEST, two)
+{
+    test_goldilocks3_gpu();
+}
+#endif
+
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
