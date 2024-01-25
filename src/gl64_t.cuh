@@ -56,6 +56,8 @@ public:
 
     inline uint64_t get_val() const { return val; }
 
+    inline void set_val(uint64_t x) { val = x; }
+
     inline operator uint64_t() const
     {   auto ret = *this; ret.from(); return ret.val;   }
     inline void store(uint64_t *p) const

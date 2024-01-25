@@ -8,7 +8,7 @@
 #include "../src/merklehash_goldilocks.hpp"
 #include <immintrin.h>
 
-#define FFT_SIZE (1 << 4)
+#define FFT_SIZE (1 << 5)
 #define NUM_REPS 5
 #define BLOWUP_FACTOR 1
 #define NUM_COLUMNS 8
@@ -1946,6 +1946,37 @@ TEST(GOLDILOCKS_TEST, merkletree_cuda)
     ASSERT_EQ(Goldilocks::toU64(root[3]), 0XAA45BE01F9E1610);
 
     free(tree);
+}
+
+TEST(GOLDILOCKS_TEST, ntt_cuda)
+{
+    Goldilocks::Element *a = (Goldilocks::Element *)malloc(FFT_SIZE * sizeof(Goldilocks::Element));
+    Goldilocks::Element *initial = (Goldilocks::Element *)malloc(FFT_SIZE * sizeof(Goldilocks::Element));
+    NTT_Goldilocks gntt(FFT_SIZE);
+    gntt.setUseGPU(true);
+
+    a[0] = Goldilocks::one();
+    a[1] = Goldilocks::one();
+    for (uint64_t i = 2; i < FFT_SIZE; i++)
+    {
+        a[i] = a[i - 1] + a[i - 2];
+    }
+
+    std::memcpy(initial, a, FFT_SIZE * sizeof(Goldilocks::Element));
+
+    // for (int i = 0; i < NUM_REPS; i++)
+    for (int i = 0; i < 1; i++)
+    {
+        gntt.NTT_GPU(a, a, FFT_SIZE);
+        gntt.INTT_GPU(a, a, FFT_SIZE);
+    }
+
+    for (int i = 0; i < FFT_SIZE; i++)
+    {
+        ASSERT_EQ(Goldilocks::toU64(a[i]), Goldilocks::toU64(initial[i]));
+    }
+    free(a);
+    free(initial);
 }
 #endif // __USE_CUDA__
 TEST(GOLDILOCKS_TEST, merkletree_avx)
