@@ -68,6 +68,3 @@ tmp
 *.sublime-workspace
 
 
-.vscode
-depends/gmp/
-depends/*.tar*

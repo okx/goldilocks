@@ -84,7 +84,7 @@ function benchMultiExpG1() {
         " fr.o"+
         // " googletest-release-1.10.0/libgtest.a"+
         " -o multiexp_g1_benchmark" +
-        " -lgmp -DUSE_OPENMP -DUSE_ASM -DARCH_X86_64 -pthread -std=c++11 -fopenmp" , {cwd: "build", nopipe: true}
+        " -lgmp -pthread -std=c++11 -fopenmp" , {cwd: "build", nopipe: true}
     );
     sh("./multiexp_g1_benchmark 16777216", {cwd: "build", nopipe: true});
 }

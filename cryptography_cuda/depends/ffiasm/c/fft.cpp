@@ -4,9 +4,6 @@
 #include <omp.h>
 #endif
 
-#if defined(USE_CUDA)
-#include "../depends/cryptography_cuda/src/lib.h"
-#endif
 using namespace std;
 
 // The function we want to execute on the new thread.
@@ -187,20 +184,8 @@ void FFT<Field>::reversePermutation(Element *a, u_int64_t n) {
 
 template <typename Field>
 void FFT<Field>::fft(Element *a, u_int64_t n) {
-    u_int64_t domainPow =log2(n);
-#if defined(USE_CUDA)
-    // printf("use cuda fft \n");
-    // fr_t *gpu_data_in = (fr_t *)malloc(n * sizeof(fr_t));
-    // for (int i = 0; i < n; i++)
-    // {
-    //     gpu_data_in[i] = *(fr_t *)(a + 32 * i);
-    // }
-    compute_ntt(0, (fr_t *)a, (uint32_t)domainPow, Ntt_Types::InputOutputOrder::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
-
-#else
-    // printf("use cpu fft \n");
     reversePermutation(a, n);
-    
+    u_int64_t domainPow =log2(n);
     assert(((u_int64_t)1 << domainPow) == n);
     for (u_int32_t s=1; s<=domainPow; s++) {
         u_int64_t m = 1 << s;
@@ -218,19 +203,12 @@ void FFT<Field>::fft(Element *a, u_int64_t n) {
             f.sub(a[k+j+mdiv2], u, t);
         }
     }
-#endif
-    
 }
 
 template <typename Field>
 void FFT<Field>::ifft(Element *a, u_int64_t n ) {
-    u_int64_t domainPow =log2(n);
-#if defined(USE_CUDA)
-    // printf("use cuda ifft \n");
-    compute_ntt(0, (fr_t *)a, (uint32_t)domainPow, Ntt_Types::InputOutputOrder::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
-#else
-    // printf("use cpu ifft \n");
     fft(a, n);
+    u_int64_t domainPow =log2(n);
     u_int64_t nDiv2= n >> 1; 
     #pragma omp parallel for
     for (u_int64_t i=1; i<nDiv2; i++) {
@@ -242,7 +220,6 @@ void FFT<Field>::ifft(Element *a, u_int64_t n ) {
     } 
     f.mul(a[0], a[0], powTwoInv[domainPow]);
     f.mul(a[n >> 1], a[n >> 1], powTwoInv[domainPow]);
-#endif
 }
 
 
