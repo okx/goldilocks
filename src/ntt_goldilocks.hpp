@@ -21,7 +21,9 @@ private:
     Goldilocks::Element *r_;
     int extension;
     uint64_t nRoots;
+#ifdef __USE_CUDA__
     bool use_gpu = false;
+#endif
 
     static u_int32_t log2(u_int64_t size)
     {
@@ -53,7 +55,6 @@ private:
 public:
     NTT_Goldilocks(u_int64_t maxDomainSize, u_int32_t _nThreads = 0, int extension_ = 1)
     {
-        use_gpu = false;
         r = NULL;
         r_ = NULL;
         if (maxDomainSize == 0)
@@ -170,11 +171,17 @@ public:
     }
     void NTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, u_int64_t nblock = NUM_BLOCKS, bool inverse = false, bool extend = false);
 
-    void NTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool inverse = false, bool extend = false);
-
     void INTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, u_int64_t nblock = NUM_BLOCKS, bool extend = false);
 
+#ifdef __USE_CUDA__
+    void NTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool inverse = false, bool extend = false);
+
     void INTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool extend = false);
+
+    void setUseGPU(bool b) {
+        this->use_gpu = b;
+    }
+#endif  // __USE_CUDA__
 
     void reversePermutation(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all);
     inline Goldilocks::Element &root(u_int32_t domainPow, u_int64_t idx)
@@ -182,9 +189,7 @@ public:
         return roots[idx << (s - domainPow)];
     }
     void extendPol(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, u_int64_t nblock = NUM_BLOCKS);
-    void setUseGPU(bool b) {
-        this->use_gpu = b;
-    }
+
 };
 
 #endif

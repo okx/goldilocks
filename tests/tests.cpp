@@ -8,7 +8,7 @@
 #include "../src/merklehash_goldilocks.hpp"
 #include <immintrin.h>
 
-#define FFT_SIZE (1 << 5)
+#define FFT_SIZE (1 << 4)
 #define NUM_REPS 5
 #define BLOWUP_FACTOR 1
 #define NUM_COLUMNS 8
@@ -1976,6 +1976,91 @@ TEST(GOLDILOCKS_TEST, ntt_cuda)
     }
     free(a);
     free(initial);
+}
+
+TEST(GOLDILOCKS_TEST, LDE_cuda)
+{
+    Goldilocks::Element *a = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * sizeof(Goldilocks::Element));
+    NTT_Goldilocks gntt(FFT_SIZE);
+    NTT_Goldilocks gntt_extension((FFT_SIZE << BLOWUP_FACTOR));
+    gntt.setUseGPU(true);
+    gntt_extension.setUseGPU(true);
+
+    Goldilocks::Element *zeros_array = (Goldilocks::Element *)malloc(((FFT_SIZE << BLOWUP_FACTOR) - FFT_SIZE) * sizeof(Goldilocks::Element));
+#pragma omp parallel for
+    for (uint i = 0; i < ((FFT_SIZE << BLOWUP_FACTOR) - FFT_SIZE); i++)
+    {
+        zeros_array[i] = Goldilocks::zero();
+    }
+
+    a[0] = Goldilocks::one();
+    a[1] = Goldilocks::one();
+    for (uint64_t i = 2; i < FFT_SIZE; i++)
+    {
+        a[i] = a[i - 1] + a[i - 2];
+    }
+
+    Goldilocks::Element shift = Goldilocks::fromU64(49); // TODO: ask for this number, where to put it how to calculate it
+    gntt.INTT_GPU(a, a, FFT_SIZE);
+
+    // TODO: This can be pre-generated
+    Goldilocks::Element *r = (Goldilocks::Element *)malloc(FFT_SIZE * sizeof(Goldilocks::Element));
+    r[0] = Goldilocks::one();
+    for (int i = 1; i < FFT_SIZE; i++)
+    {
+        r[i] = r[i - 1] * shift;
+    }
+
+#pragma omp parallel for
+    for (int i = 0; i < FFT_SIZE; i++)
+    {
+        a[i] = a[i] * r[i];
+    }
+
+    std::memcpy(&a[FFT_SIZE], zeros_array, ((FFT_SIZE << BLOWUP_FACTOR) - FFT_SIZE) * sizeof(Goldilocks::Element));
+
+    gntt_extension.NTT_GPU(a, a, (FFT_SIZE << BLOWUP_FACTOR));
+
+    /*for (int k = 0; k < 32; ++k)
+    {
+        std::cout << std::showbase << std::hex << std::uppercase << Goldilocks::toU64(a[k]) << std::endl;
+    }*/
+    ASSERT_EQ(Goldilocks::toU64(a[0]), 0XCBA857825D02DA98);
+    ASSERT_EQ(Goldilocks::toU64(a[1]), 0X46B25F2EB8DC45C6);
+    ASSERT_EQ(Goldilocks::toU64(a[2]), 0X53CD52572B82CE93);
+    ASSERT_EQ(Goldilocks::toU64(a[3]), 0X6A1C4033524890BC);
+    ASSERT_EQ(Goldilocks::toU64(a[4]), 0XA9103D6B086AC1F6);
+    ASSERT_EQ(Goldilocks::toU64(a[5]), 0XF9EDB8DE1C59C93D);
+    ASSERT_EQ(Goldilocks::toU64(a[6]), 0XDAF72007263AED14);
+    ASSERT_EQ(Goldilocks::toU64(a[7]), 0X4761FD742111A2C6);
+    ASSERT_EQ(Goldilocks::toU64(a[8]), 0X91998C571BDAFBFE);
+    ASSERT_EQ(Goldilocks::toU64(a[9]), 0X89B28028BF5894EC);
+    ASSERT_EQ(Goldilocks::toU64(a[10]), 0XDD2FD6CB9F5A0A28);
+    ASSERT_EQ(Goldilocks::toU64(a[11]), 0X43C4A931E1A7D68B);
+    ASSERT_EQ(Goldilocks::toU64(a[12]), 0X88EB7870B0E49F21);
+    ASSERT_EQ(Goldilocks::toU64(a[13]), 0X99A28535EABA76E9);
+    ASSERT_EQ(Goldilocks::toU64(a[14]), 0XC05CC85A86046420);
+    ASSERT_EQ(Goldilocks::toU64(a[15]), 0XE1DED0726EC6AB22);
+    ASSERT_EQ(Goldilocks::toU64(a[16]), 0XFF4F0AFB9C48AA53);
+    ASSERT_EQ(Goldilocks::toU64(a[17]), 0X2B3524757554A236);
+    ASSERT_EQ(Goldilocks::toU64(a[18]), 0XB867D06B39F63E5B);
+    ASSERT_EQ(Goldilocks::toU64(a[19]), 0X9D65B701D0DC0203);
+    ASSERT_EQ(Goldilocks::toU64(a[20]), 0XDB653DED8EB0E8B1);
+    ASSERT_EQ(Goldilocks::toU64(a[21]), 0X6431B1E66D89DEB8);
+    ASSERT_EQ(Goldilocks::toU64(a[22]), 0XF1CB543225A25142);
+    ASSERT_EQ(Goldilocks::toU64(a[23]), 0X199DD3926164C43A);
+    ASSERT_EQ(Goldilocks::toU64(a[24]), 0XA7B8E1EFC3CFBBF5);
+    ASSERT_EQ(Goldilocks::toU64(a[25]), 0X186D4972B303DB54);
+    ASSERT_EQ(Goldilocks::toU64(a[26]), 0X249276F9AF9641DF);
+    ASSERT_EQ(Goldilocks::toU64(a[27]), 0X2B1235BB52390A00);
+    ASSERT_EQ(Goldilocks::toU64(a[28]), 0XEE3147DB1601B67B);
+    ASSERT_EQ(Goldilocks::toU64(a[29]), 0XB8B579BA5E655721);
+    ASSERT_EQ(Goldilocks::toU64(a[30]), 0X650D467042BCD196);
+    ASSERT_EQ(Goldilocks::toU64(a[31]), 0X8249D169442CB677);
+
+    free(a);
+    free(zeros_array);
+    free(r);
 }
 #endif // __USE_CUDA__
 TEST(GOLDILOCKS_TEST, merkletree_avx)
