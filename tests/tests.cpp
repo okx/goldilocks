@@ -1964,8 +1964,7 @@ TEST(GOLDILOCKS_TEST, ntt_cuda)
 
     std::memcpy(initial, a, FFT_SIZE * sizeof(Goldilocks::Element));
 
-    // for (int i = 0; i < NUM_REPS; i++)
-    for (int i = 0; i < 1; i++)
+    for (int i = 0; i < NUM_REPS; i++)
     {
         gntt.NTT_GPU(a, a, FFT_SIZE);
         gntt.INTT_GPU(a, a, FFT_SIZE);
