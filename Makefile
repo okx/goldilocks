@@ -79,6 +79,15 @@ testsgpu: tests/tests.cpp $(ALLSRCS)
 	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 tests/goldilocks_cubic_extension.cu -arch=$(CUDA_ARCH) -g -dc --output-file goldilocks_cubic_extension_gpu.o
 	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -g -o $@ tests.o goldilocks_base_field.o goldilocks_cubic_extension.o ntt_goldilocks_gpu.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o goldilocks_cubic_extension_gpu.o -lgtest -lgmp
 
+tnttcpu: tests/test_ntt.cpp $(ALLSRCS)
+	$(CXX) tests/test_ntt.cpp src/*.cpp -lgtest -lgmp -O3 -Wall -pthread -fopenmp -mavx2 -o $@
+
+tnttgpu: tests/test_ntt.cpp $(ALLSRCS)
+	$(CXX) -D__USE_CUDA__ tests/test_ntt.cpp -O3 -pthread -fopenmp -mavx2 -c
+	$(CXX) src/goldilocks_base_field.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_base_field.o
+	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 -Xcompiler -O3 src/ntt_goldilocks.cu -arch=$(CUDA_ARCH) -dc --output-file ntt_goldilocks_gpu.o
+	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -o $@ test_ntt.o goldilocks_base_field.o ntt_goldilocks_gpu.o -lgtest -lgmp
+
 runtestscpu: testscpu
 	./testscpu --gtest_filter=GOLDILOCKS_TEST.merkletree_seq
 
@@ -92,10 +101,10 @@ benchgpu: benchs/bench.cpp $(ALLSRCS)
 	$(CXX) -D__USE_CUDA__ benchs/bench.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o tests.o
 	$(CXX) src/goldilocks_base_field.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_base_field.o
 	$(CXX) src/goldilocks_cubic_extension.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_cubic_extension.o
-	$(CXX) src/ntt_goldilocks.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o ntt_goldilocks.o
 	$(CXX) -D__USE_CUDA__ src/poseidon_goldilocks.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o poseidon_goldilocks.o
+	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 src/ntt_goldilocks.cu -arch=$(CUDA_ARCH) -dc --output-file ntt_goldilocks_gpu.o
 	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) -dc --output-file poseidon_goldilocks_gpu.o
-	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -O3 -o $@ tests.o goldilocks_base_field.o goldilocks_cubic_extension.o ntt_goldilocks.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o -lgtest -lgmp -lbenchmark
+	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -O3 -o $@ tests.o goldilocks_base_field.o goldilocks_cubic_extension.o ntt_goldilocks_gpu.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o -lgtest -lgmp -lbenchmark
 
 runbenchcpu: benchcpu
 	./benchcpu --benchmark_filter=MERKLETREE_BENCH_AVX

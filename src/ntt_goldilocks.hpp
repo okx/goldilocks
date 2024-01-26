@@ -187,6 +187,8 @@ public:
 
     void INTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool extend = false);
 
+    void Extend_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES);
+
     void setUseGPU(bool b) {
         this->use_gpu = b;
     }

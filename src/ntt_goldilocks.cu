@@ -2,6 +2,8 @@
 #include "cuda_utils.cuh"
 #include "gl64_t.cuh"
 
+#include <sys/time.h>
+
 // CUDA Threads per Block
 #define TPB 64
 #define MAX_GPUS 16
@@ -271,6 +273,8 @@ void NTT_Goldilocks::NTT_iters(Goldilocks::Element *dst, Goldilocks::Element *sr
     }
 }
 
+struct timeval start;
+
 void NTT_Goldilocks::NTT_MultiGPU_iters(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, u_int64_t nphase, Goldilocks::Element *aux, bool inverse, bool extend, uint64_t aux_size, uint64_t aux_size_last, int ngpus, int gpu_id)
 {
     Goldilocks::Element *dst_;
@@ -319,8 +323,14 @@ void NTT_Goldilocks::NTT_MultiGPU_iters(Goldilocks::Element *dst, Goldilocks::El
 
     CHECKCUDAERR(cudaSetDevice(gpu_id));
     uint64_t actual_size = (gpu_id == ngpus - 1) ? aux_size_last : aux_size;
-    CHECKCUDAERR(cudaMemcpyAsync(gpu_a[gpu_id], (uint64_t *)a + gpu_id * aux_size, actual_size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
-    CHECKCUDAERR(cudaMemcpyAsync(gpu_a2[gpu_id], (uint64_t *)a2 + gpu_id + aux_size, actual_size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
+    CHECKCUDAERR(cudaMemcpyAsync(gpu_a[gpu_id], (uint64_t *)a, actual_size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
+    CHECKCUDAERR(cudaMemcpyAsync(gpu_a2[gpu_id], (uint64_t *)a2, actual_size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
+    CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
+
+    struct timeval end;
+    gettimeofday(&end, NULL);
+    uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("Copy data to GPU %d took: %lu ms\n", gpu_id, t / 1000);
 
     uint64_t count = 1;
     for (u_int64_t s = 1; s <= domainPow; s += maxBatchPow, ++count)
@@ -345,13 +355,22 @@ void NTT_Goldilocks::NTT_MultiGPU_iters(Goldilocks::Element *dst, Goldilocks::El
         gpu_a[gpu_id] = tmpg;
     }
 
+    struct timeval end2;
+    gettimeofday(&end2, NULL);
+    t = end2.tv_sec * 1000000 + end2.tv_usec - end.tv_sec * 1000000 - end.tv_usec;
+    printf("Kernel on GPU %d took: %lu ms\n", gpu_id, t / 1000);
+
     if (a != dst_)
     {
         a = dst_;
     }
 
-    CHECKCUDAERR(cudaMemcpyAsync((uint64_t *)a + gpu_id * aux_size, gpu_a[gpu_id], actual_size * sizeof(uint64_t), cudaMemcpyDeviceToHost, gpu_stream[gpu_id]));
+    CHECKCUDAERR(cudaMemcpyAsync((uint64_t *)a, gpu_a[gpu_id], actual_size * sizeof(uint64_t), cudaMemcpyDeviceToHost, gpu_stream[gpu_id]));
     CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
+
+    gettimeofday(&end, NULL);
+    t = end.tv_sec * 1000000 + end.tv_usec - end2.tv_sec * 1000000 - end2.tv_usec;
+    printf("Copy data from GPU %d took: %lu ms\n", gpu_id, t / 1000);
 }
 
 /*
@@ -450,12 +469,13 @@ void NTT_Goldilocks::NTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element 
 
     int nDevices = 0;
     CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
-    uint64_t ncols_per_gpu = ncols / nDevices + 1;
+    uint64_t ncols_per_gpu = (ncols % nDevices) ? ncols / nDevices + 1 : ncols / nDevices;
     uint64_t ncols_last_gpu = ncols - ncols_per_gpu * (nDevices - 1);
     uint64_t aux_size = size * ncols_per_gpu;
     uint64_t aux_size_last = size * ncols_last_gpu;
 
     printf("Number of GPUs: %d\n", nDevices);
+    printf("Number columns: %lu\n", ncols);
     printf("Cols per GPU: %lu\n", ncols_per_gpu);
     printf("Cols last GPU: %lu\n", ncols_last_gpu);
     // TODO - we suppose the GPU memory is large enough
@@ -468,6 +488,8 @@ void NTT_Goldilocks::NTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element 
         aux[d] = (Goldilocks::Element *)malloc(sizeof(Goldilocks::Element) * size * ncols_per_gpu);
         dst_[d] = (Goldilocks::Element *)malloc(sizeof(Goldilocks::Element) * size * ncols_per_gpu);
     }
+
+    gettimeofday(&start, NULL);
 
 #pragma omp parallel for num_threads(nDevices)
     for (uint32_t d = 0; d < nDevices; d++)
@@ -494,6 +516,8 @@ void NTT_Goldilocks::NTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element 
         NTT_Goldilocks::NTT_MultiGPU_iters(dst_[d], src, size, d * ncols_per_gpu, aux_ncols, ncols, nphase, aux[d], inverse, extend, aux_size, aux_size_last, nDevices, d);
     }
 
+    printf("Copy back ...\n");
+    gettimeofday(&start, NULL);
     for (uint32_t d = 0; d < nDevices; d++)
     {
         uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
@@ -501,9 +525,13 @@ void NTT_Goldilocks::NTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element 
         for (u_int64_t ie = 0; ie < size; ++ie)
         {
             u_int64_t offset2 = ie * ncols + d * ncols_per_gpu;
-            std::memcpy(&dst[offset2], &dst_[ie * ncols_per_gpu], aux_ncols * sizeof(Goldilocks::Element));
+            std::memcpy(&dst[offset2], &(dst_[d][ie * aux_ncols]), aux_ncols * sizeof(Goldilocks::Element));
         }
     }
+    struct timeval end;
+    gettimeofday(&end, NULL);
+    uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("CPU memcpy took: %lu ms\n", t / 1000);
 
 #pragma omp parallel for num_threads(nDevices)
     for (uint32_t d = 0; d < nDevices; d++)
@@ -516,7 +544,124 @@ void NTT_Goldilocks::NTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element 
         CHECKCUDAERR(cudaFree(gpu_powTwoInv[d]));
         CHECKCUDAERR(cudaFree(gpu_r_[d]));
 
+        // printf("Free aux %d\n", d);
         free(aux[d]);
+        // printf("Free dst_ %d\n", d);
+        free(dst_[d]);
+    }
+}
+
+void NTT_Goldilocks::Extend_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase)
+{
+    if (ncols == 0 || size == 0)
+    {
+        return;
+    }
+
+    int nDevices = 0;
+    CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
+    uint64_t ncols_per_gpu = (ncols % nDevices) ? ncols / nDevices + 1 : ncols / nDevices;
+    uint64_t ncols_last_gpu = ncols - ncols_per_gpu * (nDevices - 1);
+    uint64_t aux_size = size * ncols_per_gpu;
+    uint64_t aux_size_last = size * ncols_last_gpu;
+    uint64_t aux_ext_size = ext_size * ncols_per_gpu;
+    uint64_t aux_ext_size_last = ext_size * ncols_last_gpu;
+
+    printf("Number of GPUs: %d\n", nDevices);
+    printf("Number columns: %lu\n", ncols);
+    printf("Cols per GPU: %lu\n", ncols_per_gpu);
+    printf("Cols last GPU: %lu\n", ncols_last_gpu);
+    // TODO - we suppose the GPU memory is large enough
+
+    Goldilocks::Element *aux[MAX_GPUS];
+    Goldilocks::Element *dst_[MAX_GPUS];
+#pragma omp parallel for num_threads(nDevices)
+    for (uint32_t d = 0; d < nDevices; d++)
+    {
+        aux[d] = (Goldilocks::Element *)malloc(sizeof(Goldilocks::Element) * ext_size * ncols_per_gpu);
+        dst_[d] = (Goldilocks::Element *)malloc(sizeof(Goldilocks::Element) * ext_size * ncols_per_gpu);
+    }
+
+    gettimeofday(&start, NULL);
+
+#pragma omp parallel for num_threads(nDevices)
+    for (uint32_t d = 0; d < nDevices; d++)
+    {
+        CHECKCUDAERR(cudaSetDevice(d));
+        CHECKCUDAERR(cudaStreamCreate(gpu_stream + d));
+        CHECKCUDAERR(cudaMalloc(&gpu_roots[d], nRoots * sizeof(uint64_t)));      // 64M
+        CHECKCUDAERR(cudaMalloc(&gpu_powTwoInv[d], (s + 1) * sizeof(uint64_t))); // small
+        CHECKCUDAERR(cudaMalloc(&gpu_r_[d], ext_size * sizeof(uint64_t))); // 64M
+        CHECKCUDAERR(cudaMemcpyAsync(gpu_r_[d], (uint64_t *)r_, ext_size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[d]));
+        CHECKCUDAERR(cudaMalloc(&gpu_a[d], aux_ext_size * sizeof(uint64_t)));  // 42G
+        CHECKCUDAERR(cudaMalloc(&gpu_a2[d], aux_ext_size * sizeof(uint64_t))); // 42G
+        CHECKCUDAERR(cudaMemcpyAsync(gpu_roots[d], (uint64_t *)roots, nRoots * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[d]));
+        CHECKCUDAERR(cudaMemcpyAsync(gpu_powTwoInv[d], (uint64_t *)powTwoInv, (s + 1) * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[d]));
+    }
+
+    // INTT with extension (inverse and extend set to true)
+#pragma omp parallel for num_threads(nDevices)
+    for (uint32_t d = 0; d < nDevices; d++)
+    {
+        uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
+        NTT_Goldilocks::NTT_MultiGPU_iters(dst_[d], src, size, d * ncols_per_gpu, aux_ncols, ncols, nphase, aux[d], true, true, aux_size, aux_size_last, nDevices, d);
+    }
+
+    printf("Copy back after INTT ...\n");
+    gettimeofday(&start, NULL);
+    for (uint32_t d = 0; d < nDevices; d++)
+    {
+        uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
+#pragma omp parallel for schedule(static)
+        for (u_int64_t ie = 0; ie < size; ++ie)
+        {
+            u_int64_t offset2 = ie * ncols + d * ncols_per_gpu;
+            std::memcpy(&dst[offset2], &(dst_[d][ie * aux_ncols]), aux_ncols * sizeof(Goldilocks::Element));
+        }
+    }
+    struct timeval end;
+    gettimeofday(&end, NULL);
+    uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("CPU memcpy took: %lu ms\n", t / 1000);
+
+    // NTT on the extended domain (inverse and extend set to false)
+#pragma omp parallel for num_threads(nDevices)
+    for (uint32_t d = 0; d < nDevices; d++)
+    {
+        uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
+        NTT_Goldilocks::NTT_MultiGPU_iters(dst_[d], dst, ext_size, d * ncols_per_gpu, aux_ncols, ncols, nphase, aux[d], false, false, aux_ext_size, aux_ext_size_last, nDevices, d);
+    }
+
+    printf("Copy back after NTT...\n");
+    gettimeofday(&start, NULL);
+    for (uint32_t d = 0; d < nDevices; d++)
+    {
+        uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
+#pragma omp parallel for schedule(static)
+        for (u_int64_t ie = 0; ie < ext_size; ++ie)
+        {
+            u_int64_t offset2 = ie * ncols + d * ncols_per_gpu;
+            std::memcpy(&dst[offset2], &(dst_[d][ie * aux_ncols]), aux_ncols * sizeof(Goldilocks::Element));
+        }
+    }
+    gettimeofday(&end, NULL);
+    t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("CPU memcpy took: %lu ms\n", t / 1000);
+
+#pragma omp parallel for num_threads(nDevices)
+    for (uint32_t d = 0; d < nDevices; d++)
+    {
+        CHECKCUDAERR(cudaSetDevice(d));
+        CHECKCUDAERR(cudaStreamDestroy(gpu_stream[d]));
+        CHECKCUDAERR(cudaFree(gpu_roots[d]));
+        CHECKCUDAERR(cudaFree(gpu_a[d]));
+        CHECKCUDAERR(cudaFree(gpu_a2[d]));
+        CHECKCUDAERR(cudaFree(gpu_powTwoInv[d]));
+        CHECKCUDAERR(cudaFree(gpu_r_[d]));
+
+        // printf("Free aux %d\n", d);
+        free(aux[d]);
+        // printf("Free dst_ %d\n", d);
         free(dst_[d]);
     }
 }
@@ -790,17 +935,21 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
     {
         computeR(N);
     }
-
+/*
     if (use_gpu)
     {
-        INTT_MultiGPU(output, input, N, ncols, tmp, nphase, true);
-        ntt_extension.NTT_MultiGPU(output, output, N_Extended, ncols, tmp, nphase);
+        // INTT_MultiGPU(output, input, N, ncols, tmp, nphase, true);
+        // ntt_extension.NTT_MultiGPU(output, output, N_Extended, ncols, tmp, nphase);
+        ntt_extension.Extend_MultiGPU(output, input, N, N_Extended, ncols);
     }
     else
     {
         INTT(output, input, N, ncols, tmp, nphase, nblock, true);
         ntt_extension.NTT(output, output, N_Extended, ncols, tmp, nphase, nblock);
     }
+*/
+    INTT(output, input, N, ncols, tmp, nphase, nblock, true);
+    ntt_extension.NTT(output, output, N_Extended, ncols, tmp, nphase, nblock);
 
     if (buffer == NULL)
     {

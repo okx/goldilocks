@@ -8,10 +8,10 @@
 #include "../src/merklehash_goldilocks.hpp"
 #include <immintrin.h>
 
-#define FFT_SIZE (1 << 4)
+#define FFT_SIZE (1 << 20)
 #define NUM_REPS 5
 #define BLOWUP_FACTOR 1
-#define NUM_COLUMNS 8
+#define NUM_COLUMNS 15
 #define NPHASES 4
 #define NCOLS_HASH 128
 #define NROWS_HASH (1 << 6)
@@ -1971,6 +1971,40 @@ TEST(GOLDILOCKS_TEST, ntt_cuda)
     }
 
     for (int i = 0; i < FFT_SIZE; i++)
+    {
+        ASSERT_EQ(Goldilocks::toU64(a[i]), Goldilocks::toU64(initial[i]));
+    }
+    free(a);
+    free(initial);
+}
+
+TEST(GOLDILOCKS_TEST, ntt_cuda_multi)
+{
+    Goldilocks::Element *a = (Goldilocks::Element *)malloc(FFT_SIZE * NUM_COLUMNS * sizeof(Goldilocks::Element));
+    Goldilocks::Element *initial = (Goldilocks::Element *)malloc(FFT_SIZE * NUM_COLUMNS * sizeof(Goldilocks::Element));
+    NTT_Goldilocks gntt(FFT_SIZE);
+    gntt.setUseGPU(true);
+
+    for (uint64_t j = 0; j < NUM_COLUMNS; j++) {
+        a[0 + j] = Goldilocks::one();
+        a[NUM_COLUMNS + j] = Goldilocks::one();
+    }
+    for (uint64_t i = 2; i < FFT_SIZE; i++)
+    {
+        for (uint64_t j = 0; j < NUM_COLUMNS; j++) {
+            a[i * NUM_COLUMNS + j] = a[(i - 1) * NUM_COLUMNS + j] + a[(i - 2) * NUM_COLUMNS + j];
+        }
+    }
+
+    std::memcpy(initial, a, FFT_SIZE * NUM_COLUMNS * sizeof(Goldilocks::Element));
+
+    for (int i = 0; i < NUM_REPS; i++)
+    {
+        gntt.NTT_MultiGPU(a, a, FFT_SIZE, NUM_COLUMNS);
+        gntt.INTT_MultiGPU(a, a, FFT_SIZE, NUM_COLUMNS);
+    }
+
+    for (int i = 0; i < FFT_SIZE * NUM_COLUMNS; i++)
     {
         ASSERT_EQ(Goldilocks::toU64(a[i]), Goldilocks::toU64(initial[i]));
     }

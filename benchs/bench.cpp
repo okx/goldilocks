@@ -11,7 +11,7 @@
 #include <math.h> /* ceil */
 #include "omp.h"
 
-#define FFT_SIZE (1 << 23)
+#define FFT_SIZE (1 << 22)
 
 #define NUM_HASHES 2097152
 #define NCOLS_HASH 128
@@ -497,6 +497,34 @@ static void MERKLETREE_BENCH_CUDA(benchmark::State &state)
     state.counters["BytesProcessed"] = benchmark::Counter((uint64_t)NROWS_HASH * (uint64_t)NCOLS_HASH * sizeof(Goldilocks::Element), benchmark::Counter::kIsIterationInvariantRate, benchmark::Counter::OneK::kIs1024);
     delete[] cols;
     delete[] tree;
+}
+static void NTT_BENCH_CUDA(benchmark::State &state)
+{
+    NTT_Goldilocks gntt(FFT_SIZE, state.range(0));
+    gntt.setUseGPU(true);
+
+    Goldilocks::Element *a = (Goldilocks::Element *)malloc((uint64_t)FFT_SIZE * (uint64_t)NUM_COLUMNS * sizeof(Goldilocks::Element));
+
+#pragma omp parallel for
+    for (uint64_t k = 0; k < NUM_COLUMNS; k++)
+    {
+        uint64_t offset = k * FFT_SIZE;
+        a[offset] = Goldilocks::one();
+        a[offset + 1] = Goldilocks::one();
+        for (uint64_t i = 2; i < FFT_SIZE; i++)
+        {
+            a[offset + i] = a[offset + i - 1] + a[offset + i - 2];
+        }
+    }
+    for (auto _ : state)
+    {
+        for (u_int64_t i = 0; i < NUM_COLUMNS; i++)
+        {
+            u_int64_t offset = i * FFT_SIZE;
+            gntt.NTT_GPU(a + offset, a + offset, FFT_SIZE);
+        }
+    }
+    free(a);
 }
 #endif  // __USE_CUDA__
 static void MERKLETREE_BENCH_AVX(benchmark::State &state)
@@ -994,6 +1022,11 @@ BENCHMARK(MERKLETREE_BENCH)
 #ifdef __USE_CUDA__
 BENCHMARK(MERKLETREE_BENCH_CUDA)
     ->Unit(benchmark::kMicrosecond)
+    ->DenseRange(omp_get_max_threads() / 2, omp_get_max_threads(), omp_get_max_threads() / 2)
+    ->UseRealTime();
+
+BENCHMARK(NTT_BENCH_CUDA)
+    ->Unit(benchmark::kSecond)
     ->DenseRange(omp_get_max_threads() / 2, omp_get_max_threads(), omp_get_max_threads() / 2)
     ->UseRealTime();
 #endif
