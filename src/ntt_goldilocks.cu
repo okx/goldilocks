@@ -271,7 +271,7 @@ void NTT_Goldilocks::NTT_iters(Goldilocks::Element *dst, Goldilocks::Element *sr
     }
 }
 
-void NTT_Goldilocks::NTT_GPU_iters(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, u_int64_t nphase, Goldilocks::Element *aux, bool inverse, bool extend, uint64_t aux_size, uint64_t aux_size_last, int ngpus, int gpu_id)
+void NTT_Goldilocks::NTT_MultiGPU_iters(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, u_int64_t nphase, Goldilocks::Element *aux, bool inverse, bool extend, uint64_t aux_size, uint64_t aux_size_last, int ngpus, int gpu_id)
 {
     Goldilocks::Element *dst_;
     if (dst != NULL)
@@ -354,7 +354,94 @@ void NTT_Goldilocks::NTT_GPU_iters(Goldilocks::Element *dst, Goldilocks::Element
     CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
 }
 
-void NTT_Goldilocks::NTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, bool inverse, bool extend)
+/*
+ * Only 1 GPU
+ */
+void NTT_Goldilocks::NTT_GPU_iters(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, u_int64_t nphase, Goldilocks::Element *aux, bool inverse, bool extend, uint64_t aux_size)
+{
+    Goldilocks::Element *dst_;
+    if (dst != NULL)
+    {
+        dst_ = dst;
+    }
+    else
+    {
+        dst_ = src;
+    }
+    Goldilocks::Element *a = dst_;
+    Goldilocks::Element *a2 = aux;
+    Goldilocks::Element *tmp;
+
+    u_int64_t domainPow = log2(size);
+    assert(((u_int64_t)1 << domainPow) == size);
+    if (nphase < 1 || domainPow == 0)
+    {
+        nphase = 1;
+    }
+    else if (nphase > domainPow)
+    {
+        nphase = domainPow;
+    }
+    u_int64_t maxBatchPow = s / nphase;
+    u_int64_t res = s % nphase;
+    if (res > 0)
+    {
+        maxBatchPow += 1;
+    }
+    bool iseven = true;
+    tmp = a;
+    if (nphase % 2 == 1)
+    {
+        iseven = false;
+        tmp = a2;
+    }
+    reversePermutation(tmp, src, size, offset_cols, ncols, ncols_all);
+    if (iseven == false)
+    {
+        tmp = a2;
+        a2 = a;
+        a = tmp;
+    }
+
+    int gpu_id = 0;
+    uint64_t actual_size = aux_size;
+    CHECKCUDAERR(cudaSetDevice(gpu_id));
+    CHECKCUDAERR(cudaMemcpyAsync(gpu_a[gpu_id], (uint64_t *)a, actual_size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
+    CHECKCUDAERR(cudaMemcpyAsync(gpu_a2[gpu_id], (uint64_t *)a2, actual_size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
+
+    uint64_t count = 1;
+    for (u_int64_t s = 1; s <= domainPow; s += maxBatchPow, ++count)
+    {
+        if (res > 0 && count == res + 1 && maxBatchPow > 1)
+        {
+            maxBatchPow -= 1;
+        }
+        u_int64_t sInc = s + maxBatchPow <= domainPow ? maxBatchPow : domainPow - s + 1;
+        u_int64_t rs = s - 1;
+        u_int64_t re = domainPow - 1;
+        u_int64_t rb = 1 << rs;
+        u_int64_t rm = (1 << (re - rs)) - 1;
+        u_int64_t batchSize = 1 << sInc;
+        u_int64_t nBatches = size / batchSize;
+
+        ntt_iter_loop<<<nBatches / TPB + 1, TPB, 0, gpu_stream[gpu_id]>>>(nBatches, gpu_roots[gpu_id], gpu_a[gpu_id], gpu_a2[gpu_id], gpu_powTwoInv[gpu_id], gpu_r_[gpu_id], batchSize, ncols, rs, re, rb, rm, this->s, s, sInc, maxBatchPow, domainPow, inverse, extend, size);
+        CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
+
+        gl64_t *tmpg = gpu_a2[gpu_id];
+        gpu_a2[gpu_id] = gpu_a[gpu_id];
+        gpu_a[gpu_id] = tmpg;
+    }
+
+    if (a != dst_)
+    {
+        a = dst_;
+    }
+
+    CHECKCUDAERR(cudaMemcpyAsync((uint64_t *)a, gpu_a[gpu_id], actual_size * sizeof(uint64_t), cudaMemcpyDeviceToHost, gpu_stream[gpu_id]));
+    CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
+}
+
+void NTT_Goldilocks::NTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, bool inverse, bool extend)
 {
     if (ncols == 0 || size == 0)
     {
@@ -373,14 +460,13 @@ void NTT_Goldilocks::NTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src,
     printf("Cols last GPU: %lu\n", ncols_last_gpu);
     // TODO - we suppose the GPU memory is large enough
 
-    Goldilocks::Element *aux = NULL;
-    if (buffer == NULL)
+    Goldilocks::Element *aux[MAX_GPUS];
+    Goldilocks::Element *dst_[MAX_GPUS];
+#pragma omp parallel for num_threads(nDevices)
+    for (uint32_t d = 0; d < nDevices; d++)
     {
-        aux = (Goldilocks::Element *)malloc(sizeof(Goldilocks::Element) * size * ncols);
-    }
-    else
-    {
-        aux = buffer;
+        aux[d] = (Goldilocks::Element *)malloc(sizeof(Goldilocks::Element) * size * ncols_per_gpu);
+        dst_[d] = (Goldilocks::Element *)malloc(sizeof(Goldilocks::Element) * size * ncols_per_gpu);
     }
 
 #pragma omp parallel for num_threads(nDevices)
@@ -405,12 +491,18 @@ void NTT_Goldilocks::NTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src,
     for (uint32_t d = 0; d < nDevices; d++)
     {
         uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
-        NTT_Goldilocks::NTT_GPU_iters(dst, src, size, d * ncols_per_gpu, aux_ncols, ncols, nphase, aux, inverse, extend, aux_size, aux_size_last, nDevices, d);
+        NTT_Goldilocks::NTT_MultiGPU_iters(dst_[d], src, size, d * ncols_per_gpu, aux_ncols, ncols, nphase, aux[d], inverse, extend, aux_size, aux_size_last, nDevices, d);
     }
 
-    if (buffer == NULL)
+    for (uint32_t d = 0; d < nDevices; d++)
     {
-        free(aux);
+        uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
+#pragma omp parallel for schedule(static)
+        for (u_int64_t ie = 0; ie < size; ++ie)
+        {
+            u_int64_t offset2 = ie * ncols + d * ncols_per_gpu;
+            std::memcpy(&dst[offset2], &dst_[ie * ncols_per_gpu], aux_ncols * sizeof(Goldilocks::Element));
+        }
     }
 
 #pragma omp parallel for num_threads(nDevices)
@@ -423,8 +515,63 @@ void NTT_Goldilocks::NTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src,
         CHECKCUDAERR(cudaFree(gpu_a2[d]));
         CHECKCUDAERR(cudaFree(gpu_powTwoInv[d]));
         CHECKCUDAERR(cudaFree(gpu_r_[d]));
+
+        free(aux[d]);
+        free(dst_[d]);
     }
 }
+
+/**
+ * 1 GPU
+ */
+void NTT_Goldilocks::NTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, bool inverse, bool extend)
+{
+    if (ncols == 0 || size == 0)
+    {
+        return;
+    }
+
+    Goldilocks::Element *aux = NULL;
+    uint64_t aux_size = size * ncols;
+    if (buffer == NULL)
+    {
+        aux = (Goldilocks::Element *)malloc(sizeof(Goldilocks::Element) * aux_size);
+    }
+    else
+    {
+        aux = buffer;
+    }
+
+    int gpu_id = 0;
+    CHECKCUDAERR(cudaSetDevice(gpu_id));
+    CHECKCUDAERR(cudaStreamCreate(gpu_stream + gpu_id));
+    CHECKCUDAERR(cudaMalloc(&gpu_roots[gpu_id], nRoots * sizeof(uint64_t)));      // 64M
+    CHECKCUDAERR(cudaMalloc(&gpu_powTwoInv[gpu_id], (s + 1) * sizeof(uint64_t))); // small
+    if (extend)
+    {
+        CHECKCUDAERR(cudaMalloc(&gpu_r_[gpu_id], size * sizeof(uint64_t))); // 64M
+        CHECKCUDAERR(cudaMemcpyAsync(gpu_r_[gpu_id], (uint64_t *)r_, size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
+    }
+    CHECKCUDAERR(cudaMalloc(&gpu_a[gpu_id], aux_size * sizeof(uint64_t)));  // 42G
+    CHECKCUDAERR(cudaMalloc(&gpu_a2[gpu_id], aux_size * sizeof(uint64_t))); // 42G
+    CHECKCUDAERR(cudaMemcpyAsync(gpu_roots[gpu_id], (uint64_t *)roots, nRoots * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
+    CHECKCUDAERR(cudaMemcpyAsync(gpu_powTwoInv[gpu_id], (uint64_t *)powTwoInv, (s + 1) * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
+
+    NTT_Goldilocks::NTT_GPU_iters(dst, src, size, 0, ncols, ncols, nphase, aux, inverse, extend, aux_size);
+
+    if (buffer == NULL)
+    {
+        free(aux);
+    }
+
+    CHECKCUDAERR(cudaStreamDestroy(gpu_stream[gpu_id]));
+    CHECKCUDAERR(cudaFree(gpu_roots[gpu_id]));
+    CHECKCUDAERR(cudaFree(gpu_a[gpu_id]));
+    CHECKCUDAERR(cudaFree(gpu_a2[gpu_id]));
+    CHECKCUDAERR(cudaFree(gpu_powTwoInv[gpu_id]));
+    CHECKCUDAERR(cudaFree(gpu_r_[gpu_id]));
+}
+
 /**
  * @brief permutation of components of an array in bit-reversal order. If dst==src the permutation is performed on-site.
  *
@@ -586,6 +733,25 @@ void NTT_Goldilocks::INTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_
     NTT(dst_, src, size, ncols, buffer, nphase, nblock, true, extend);
 }
 
+void NTT_Goldilocks::INTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, bool extend)
+{
+
+    if (ncols == 0 || size == 0)
+    {
+        return;
+    }
+    Goldilocks::Element *dst_;
+    if (dst == NULL)
+    {
+        dst_ = src;
+    }
+    else
+    {
+        dst_ = dst;
+    }
+    NTT_MultiGPU(dst_, src, size, ncols, buffer, nphase, true, extend);
+}
+
 void NTT_Goldilocks::INTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, bool extend)
 {
 
@@ -627,8 +793,8 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
 
     if (use_gpu)
     {
-        INTT(output, input, N, ncols, tmp, nphase, true);
-        ntt_extension.NTT(output, output, N_Extended, ncols, tmp, nphase);
+        INTT_MultiGPU(output, input, N, ncols, tmp, nphase, true);
+        ntt_extension.NTT_MultiGPU(output, output, N_Extended, ncols, tmp, nphase);
     }
     else
     {
