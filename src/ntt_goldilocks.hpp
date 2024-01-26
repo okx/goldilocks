@@ -128,6 +128,9 @@ public:
         {
             powTwoInv[i] = powTwoInv[i - 1] * powTwoInv[1];
         }
+        for (uint64_t i = 0; i <= s; i++) {
+          printf("powTwoInv%llu: %llu\n", i, Goldilocks::toU64(powTwoInv[i]));
+        }
 
         mpz_clear(m_qm1d2);
         mpz_clear(m_q);
