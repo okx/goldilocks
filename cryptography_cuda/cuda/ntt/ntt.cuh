@@ -46,6 +46,29 @@ protected:
         CUDA_OK(cudaGetLastError());
     }
 
+private:
+    static void LDE_powers(fr_t* inout, bool innt, bool bitrev,
+                           uint32_t lg_domain_size, uint32_t lg_blowup,
+                           stream_t& stream, bool ext_pow = false)
+    {
+        printf("LDE_powers\n");
+        size_t domain_size = (size_t)1 << lg_domain_size;
+        const auto gen_powers =
+                NTTParameters::all(innt)[stream]->partial_group_gen_powers;
+
+        if (domain_size < WARP_SZ)
+            LDE_distribute_powers<<<1, domain_size, 0, stream>>>
+                    (inout, lg_blowup, bitrev, gen_powers, ext_pow);
+        else if (domain_size < 512)
+            LDE_distribute_powers<<<domain_size / WARP_SZ, WARP_SZ, 0, stream>>>
+                    (inout, lg_blowup, bitrev, gen_powers, ext_pow);
+        else
+            LDE_distribute_powers<<<domain_size / 512, 512, 0, stream>>>
+                    (inout, lg_blowup, bitrev, gen_powers, ext_pow);
+
+        CUDA_OK(cudaGetLastError());
+    }
+
     static void NTT_internal(fr_t* d_inout, uint32_t lg_domain_size,
                              InputOutputOrder order, Direction direction,
                              Type type, stream_t& stream,
@@ -77,6 +100,9 @@ protected:
             default:
                 assert(false);
         }
+        if (!intt && type == Type::coset)
+            LDE_powers(d_inout, intt, bitrev, lg_domain_size, 0, stream,
+                       coset_ext_pow);
         // printf("inside NTT_internal \n");
         switch (algorithm) {
             case Algorithm::GS:
@@ -87,6 +113,9 @@ protected:
                 CT_NTT(d_inout, lg_domain_size, intt, ntt_parameters, stream);
                 break;
         }
+        if (intt && type == Type::coset)
+            LDE_powers(d_inout, intt, !bitrev, lg_domain_size, 0, stream,
+                       coset_ext_pow);
         if (order == InputOutputOrder::RR)
             bit_rev(d_inout, d_inout, lg_domain_size, stream);
     }

@@ -88,11 +88,8 @@ runnttcpu: testscpu
 runnttgpu: testsgpu
 	./testsgpu --gtest_filter=GOLDILOCKS_TEST.extendePol_cuda
 
-runrp1: testscpu
-	./testscpu --gtest_filter=GOLDILOCKS_TEST.rp1
-
-runrp2: testscpu
-	./testscpu --gtest_filter=GOLDILOCKS_TEST.rp2
+runntt23: testscpu
+	./testscpu --gtest_filter=GOLDILOCKS_TEST.ntt23
 
 runintt: testscpu
 	./testscpu --gtest_filter=GOLDILOCKS_TEST.intt

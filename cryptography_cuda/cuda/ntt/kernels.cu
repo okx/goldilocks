@@ -117,20 +117,44 @@ fr_t get_intermediate_root(index_t pow, const fr_t (*roots)[WINDOW_SIZE],
 __device__ __forceinline__
 void get_intermediate_roots(fr_t& root0, fr_t& root1,
                             index_t idx0, index_t idx1,
-                            const fr_t (*roots)[WINDOW_SIZE])
-{
+                            const fr_t (*roots)[WINDOW_SIZE]) {
     int win = (WINDOW_NUM - 1) * LG_WINDOW_SIZE;
     int off = (WINDOW_NUM - 1);
 
     root0 = roots[off][idx0 >> win];
     root1 = roots[off][idx1 >> win];
-    #pragma unroll 1
+#pragma unroll 1
     while (off--) {
         fr_t t;
         win -= LG_WINDOW_SIZE;
         root0 *= (t = roots[off][(idx0 >> win) % WINDOW_SIZE]);
         root1 *= (t = roots[off][(idx1 >> win) % WINDOW_SIZE]);
     }
+}
+
+__launch_bounds__(1024) __global__
+void LDE_distribute_powers(fr_t* d_inout, uint32_t lg_blowup, bool bitrev,
+                           const fr_t (*gen_powers)[WINDOW_SIZE],
+                           bool ext_pow = false)
+{
+    index_t idx = threadIdx.x + blockDim.x * (index_t)blockIdx.x;
+    index_t pow = idx;
+    fr_t r = d_inout[idx];
+
+    if (bitrev) {
+        size_t domain_size = gridDim.x * (size_t)blockDim.x;
+        assert((domain_size & (domain_size-1)) == 0);
+        uint32_t lg_domain_size = 63 - __clzll(domain_size);
+
+        pow = bit_rev(idx, lg_domain_size);
+    }
+
+    if (ext_pow)
+        pow <<= lg_blowup;
+
+    r = r * get_intermediate_root(pow, gen_powers);
+
+    d_inout[idx] = r;
 }
 
 template<unsigned int z_count>

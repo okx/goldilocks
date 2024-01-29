@@ -8,7 +8,7 @@
 #include "../src/merklehash_goldilocks.hpp"
 #include <immintrin.h>
 
-#define LOG_FFT_SIZE 2
+#define LOG_FFT_SIZE 4
 #define FFT_SIZE (1 << LOG_FFT_SIZE)
 #define NUM_REPS 5
 #define BLOWUP_FACTOR 1
@@ -2620,13 +2620,41 @@ TEST(GOLDILOCKS_TEST, LDE_block)
     free(a);
     free(r);
 }
-TEST(GOLDILOCKS_TEST, rp1)
+TEST(GOLDILOCKS_TEST, ntt23)
+{
+
+    const uint64_t SIZE = 1<<23;
+    Goldilocks::Element *a = (Goldilocks::Element *)malloc(SIZE * sizeof(Goldilocks::Element));
+    Goldilocks::Element *b = (Goldilocks::Element *)malloc(SIZE * sizeof(Goldilocks::Element));
+
+    NTT_Goldilocks ntt(SIZE);
+    ntt.computeR(SIZE);
+
+    for (uint i = 0; i < SIZE; i++)
+    {
+        a[i] = Goldilocks::fromU64(i);
+    }
+
+    ntt.NTT(b, a, SIZE, 1, NULL, 3, 1, false);
+
+    printf("\noutputs:\n");
+    for (uint j = 0; j < 8; j++)
+    {
+        printf("%lu\n", Goldilocks::toU64(b[j]));
+    }
+
+    free(a);
+    free(b);
+}
+
+TEST(GOLDILOCKS_TEST, intt)
 {
 
     Goldilocks::Element *a = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
     Goldilocks::Element *b = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
 
     NTT_Goldilocks ntt(FFT_SIZE);
+    ntt.computeR(FFT_SIZE);
 
     for (uint i = 0; i < 2; i++)
     {
@@ -2645,78 +2673,22 @@ TEST(GOLDILOCKS_TEST, rp1)
     }
 
     printf("inputs:\n");
+    printf("[");
     for (uint j = 0; j < FFT_SIZE * NUM_COLUMNS; j++)
     {
-        printf("%lu\n", Goldilocks::toU64(a[j]));
+        printf("%lu, ", Goldilocks::toU64(a[j]));
     }
+    printf("]\n");
 
-    ntt.reversePermutation(a, a, FFT_SIZE, 0, NUM_COLUMNS, NUM_COLUMNS);
+    ntt.INTT(a, a, FFT_SIZE, 1, NULL, 3, 1, false);
 
     printf("\noutputs:\n");
-    for (uint j = 0; j < FFT_SIZE * NUM_COLUMNS; j++)
+    printf("[");
+    for (uint j = 0; j < FFT_SIZE; j++)
     {
-        printf("%lu\n", Goldilocks::toU64(a[j]));
+        printf("%lu, ", Goldilocks::toU64(a[j]));
     }
-
-    free(a);
-    free(b);
-}
-TEST(GOLDILOCKS_TEST, rp2)
-{
-
-
-    Goldilocks::Element *a = (Goldilocks::Element *)malloc(8 * sizeof(Goldilocks::Element));
-    Goldilocks::Element *b = (Goldilocks::Element *)malloc(16 * sizeof(Goldilocks::Element));
-
-    NTT_Goldilocks ntt(FFT_SIZE, 0, 2);
-
-    a[0] = Goldilocks::fromU64(4611686017353646082);
-    a[1] = Goldilocks::fromU64(13836043214479425535LU);
-    a[2] = Goldilocks::fromU64(4611686017353646068);
-    a[3] = Goldilocks::fromU64(13786785093555060651LU);
-    a[4] = Goldilocks::fromU64(93460390834944);
-    a[5] = Goldilocks::fromU64(45);
-    a[6] = Goldilocks::fromU64(45);
-    a[7] = Goldilocks::fromU64(64424509454);
-
-    printf("inputs:\n");
-    for (uint j = 0; j < 8; j++)
-    {
-        printf("%lu\n", Goldilocks::toU64(a[j]));
-    }
-
-    ntt.reversePermutation(b, a, 4, 0, 2, 2);
-
-    printf("\noutputs:\n");
-    for (uint j = 0; j < 16; j++)
-    {
-        printf("%lu\n", Goldilocks::toU64(b[j]));
-    }
-
-    free(a);
-}
-TEST(GOLDILOCKS_TEST, intt)
-{
-
-    Goldilocks::Element *a = (Goldilocks::Element *)malloc(8 * sizeof(Goldilocks::Element));
-    Goldilocks::Element *b = (Goldilocks::Element *)malloc(8 * sizeof(Goldilocks::Element));
-
-    NTT_Goldilocks ntt(4, 0, 1);
-
-    a[0] = Goldilocks::fromU64(1);
-    a[1] = Goldilocks::fromU64(1);
-    a[2] = Goldilocks::fromU64(2);
-    a[3] = Goldilocks::fromU64(3);
-
-    ntt.INTT(b, a, 4);
-    //ntt.reversePermutation(a, a, FFT_SIZE, 0, NUM_COLUMNS, NUM_COLUMNS);
-    //ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, b);
-
-    printf("\noutputs:\n");
-    for (uint j = 0; j < 4; j++)
-    {
-        printf("%lu\n", Goldilocks::toU64(b[j]));
-    }
+    printf("]\n");
 
     free(a);
     free(b);
@@ -2726,19 +2698,29 @@ TEST(GOLDILOCKS_TEST, intt)
 TEST(GOLDILOCKS_TEST, intt_cuda)
 {
 
-    Goldilocks::Element *a = (Goldilocks::Element *)malloc(8 * sizeof(Goldilocks::Element));
-    Goldilocks::Element *b = (Goldilocks::Element *)malloc(8 * sizeof(Goldilocks::Element));
+    Goldilocks::Element *a = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+    Goldilocks::Element *b = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
 
-    NTT_Goldilocks ntt(4, 0, 1);
+    NTT_Goldilocks ntt(FFT_SIZE);
+    ntt.computeR(FFT_SIZE);
 
-    a[0] = Goldilocks::fromU64(1);
-    a[1] = Goldilocks::fromU64(1);
-    a[2] = Goldilocks::fromU64(2);
-    a[3] = Goldilocks::fromU64(3);
+    for (uint i = 0; i < 2; i++)
+    {
+        for (uint j = 0; j < NUM_COLUMNS; j++)
+        {
+            Goldilocks::add(a[i * NUM_COLUMNS + j], Goldilocks::one(), Goldilocks::fromU64(j));
+        }
+    }
 
-    ntt.INTT_cuda(a, 4);
-    //ntt.reversePermutation(a, a, FFT_SIZE, 0, NUM_COLUMNS, NUM_COLUMNS);
-    //ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, b);
+    for (uint64_t i = 2; i < FFT_SIZE; i++)
+    {
+        for (uint j = 0; j < NUM_COLUMNS; j++)
+        {
+            a[i * NUM_COLUMNS + j] = a[NUM_COLUMNS * (i - 1) + j] + a[NUM_COLUMNS * (i - 2) + j];
+        }
+    }
+
+    ntt.INTT_cuda(a, FFT_SIZE, false);
 
     printf("\noutputs:\n");
     for (uint j = 0; j < 4; j++)
@@ -2775,24 +2757,22 @@ TEST(GOLDILOCKS_TEST, extendePol_cpu)
         }
     }
 
-//    printf("inputs:\n");
-//    printf("[");
-//    for (uint j = 0; j < FFT_SIZE * NUM_COLUMNS; j++)
-//    {
-//        printf("%lu, ", Goldilocks::toU64(a[j]));
-//    }
-//    printf("]\n");
+    printf("inputs:\n");
+    printf("[");
+    for (uint j = 0; j < FFT_SIZE * NUM_COLUMNS; j++)
+    {
+        printf("%lu, ", Goldilocks::toU64(a[j]));
+    }
+    printf("]\n");
 
     ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS);
-    //ntt.computeR(FFT_SIZE);
-    //ntt.INTT(b,a,FFT_SIZE, 1, NULL, 3, 1, true);
-//    printf("\noutputs:\n");
-//    printf("[");
-//    for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS; j++)
-//    {
-//        printf("%lu, ", Goldilocks::toU64(b[j]));
-//    }
-//    printf("]\n");
+    printf("\noutputs:\n");
+    printf("[");
+    for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS; j++)
+    {
+        printf("%lu, ", Goldilocks::toU64(a[j]));
+    }
+    printf("]\n");
 
 //    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-4) * NUM_COLUMNS]), 0X97FACF1FAD53863F);
 //    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-3) * NUM_COLUMNS]), 0X629DBA77EEE23EB8);
@@ -2861,13 +2841,13 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
         }
     }
 
-//    printf("inputs:\n");
-//    printf("[");
-//    for (uint j = 0; j < FFT_SIZE * NUM_COLUMNS; j++)
-//    {
-//        printf("%lu, ", Goldilocks::toU64(a[j]));
-//    }
-//    printf("]\n");
+    printf("inputs:\n");
+    printf("[");
+    for (uint j = 0; j < FFT_SIZE * NUM_COLUMNS; j++)
+    {
+        printf("%lu, ", Goldilocks::toU64(a[j]));
+    }
+    printf("]\n");
 
     ntt.extendPol_cuda(b, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS);
     printf("\noutputs:\n");
