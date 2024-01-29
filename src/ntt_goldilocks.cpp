@@ -1,4 +1,8 @@
 #include "ntt_goldilocks.hpp"
+#ifdef __USE_CUDA__
+#include "../cryptography_cuda/src/lib.h"
+#include "../cryptography_cuda/cuda/ntt/ntt.h"
+#endif // __USE_CUDA__
 
 static inline u_int64_t BR(u_int64_t x, u_int64_t domainPow)
 {
@@ -48,6 +52,14 @@ void NTT_Goldilocks::NTT_iters(Goldilocks::Element *dst, Goldilocks::Element *sr
         tmp = a2;
     }
     reversePermutation(tmp, src, size, offset_cols, ncols, ncols_all);
+//    printf("\nafter reversePermutation:\n");
+//    printf("[");
+//    for (uint j = 0; j < size * ncols; j++)
+//    {
+//        printf("%lu, ", Goldilocks::toU64(tmp[j]));
+//    }
+//    printf("]\n");
+
     if (iseven == false)
     {
         tmp = a2;
@@ -322,6 +334,12 @@ void NTT_Goldilocks::INTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_
     }
     NTT(dst_, src, size, ncols, buffer, nphase, nblock, true, extend);
 }
+#ifdef __USE_CUDA__
+void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *src, u_int64_t size)
+{
+    compute_ntt(0, (fr_t *)(uint64_t *)src, log2(size), Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::coset);
+}
+#endif // __USE_CUDA__
 
 void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock)
 {
@@ -337,12 +355,16 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
         tmp = buffer;
     }
     // TODO: Pre-compute r
-    if (r == NULL)
-    {
-        computeR(N);
-    }
+    computeR(N);
 
     INTT(output, input, N, ncols, tmp, nphase, nblock, true);
+//    printf("\nINTT result:\n");
+//    printf("[");
+//    for (uint j = 0; j < N_Extended * ncols; j++)
+//    {
+//        printf("%lu, ", Goldilocks::toU64(output[j]));
+//    }
+//    printf("]\n");
     ntt_extension.NTT(output, output, N_Extended, ncols, tmp, nphase, nblock);
 
     if (buffer == NULL)
@@ -350,3 +372,46 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
         free(tmp);
     }
 }
+
+#ifdef __USE_CUDA__
+void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock)
+{
+    NTT_Goldilocks ntt_extension(N_Extended, nThreads, N_Extended / N);
+
+    Goldilocks::Element *tmp = NULL;
+    if (buffer == NULL)
+    {
+        tmp = (Goldilocks::Element *)malloc(N_Extended * ncols * sizeof(Goldilocks::Element));
+    }
+    else
+    {
+        tmp = buffer;
+    }
+    // TODO: Pre-compute r
+    computeR(N);
+
+    INTT(output, input, N, ncols, tmp, nphase, nblock, true);
+//    printf("\nINTT result:\n");
+//    printf("[");
+//    for (uint j = 0; j < N_Extended * ncols; j++)
+//    {
+//        printf("%lu, ", Goldilocks::toU64(output[j]));
+//    }
+//    printf("]\n");
+    //ntt_extension.reversePermutation(tmp, output, N_Extended, 0, ncols, ncols);
+//    printf("\nafter reversePermutation:\n");
+//    printf("[");
+//    for (uint j = 0; j < N_Extended * ncols; j++)
+//    {
+//        printf("%lu, ", Goldilocks::toU64(tmp[j]));
+//    }
+//    printf("]\n");
+    //Goldilocks::parcpy(output, tmp, N_Extended * ncols, nThreads);
+    compute_ntt(0, (fr_t *)(uint64_t *)output, log2(N_Extended), Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
+
+    if (buffer == NULL)
+    {
+        free(tmp);
+    }
+}
+#endif // __USE_CUDA__

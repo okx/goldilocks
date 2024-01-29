@@ -152,6 +152,10 @@ public:
     }
     inline void computeR(int N)
     {
+        if (r != NULL)
+        {
+            return;
+        }
         u_int64_t domainPow = log2(N);
         r = new Goldilocks::Element[N];
         r_ = new Goldilocks::Element[N];
@@ -171,6 +175,10 @@ public:
         return roots[idx << (s - domainPow)];
     }
     void extendPol(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, u_int64_t nblock = NUM_BLOCKS);
+#ifdef __USE_CUDA__
+    void extendPol_cuda(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, u_int64_t nblock = NUM_BLOCKS);
+    void INTT_cuda(Goldilocks::Element *src, u_int64_t size);
+#endif // __USE_CUDA__
 };
 
 #endif

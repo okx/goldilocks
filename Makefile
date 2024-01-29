@@ -66,11 +66,11 @@ testscpu: tests/tests.cpp $(ALLSRCS)
 	$(CXX) tests/tests.cpp src/*.cpp -lgtest -lgmp -g -Wall -pthread -fopenmp -mavx2 -o $@
 
 testsgpu: tests/tests.cpp $(ALLSRCS)
-	$(CXX) -D__USE_CUDA__ tests/tests.cpp -fPIC -g -Wall -pthread -fopenmp -mavx2 -c -Icryptography_cuda/depends/blst/src -I/usr/local/cuda/include -Icryptography_cuda/cuda -o tests.o
+	$(CXX) -D__USE_CUDA__ tests/tests.cpp -fPIC -g -Wall -pthread -fopenmp -mavx2 -c -o tests.o
 	$(CXX) -D__USE_CUDA__ cryptography_cuda/cuda/util/all_gpus.cpp -fPIC -g -Wall -pthread -fopenmp -mavx2 -c -Icryptography_cuda/depends/blst/src -I/usr/local/cuda/include -Icryptography_cuda/cuda/util -o util.o
 	$(CXX) src/goldilocks_base_field.cpp -fPIC -g -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_base_field.o
 	$(CXX) src/goldilocks_cubic_extension.cpp -fPIC -g -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_cubic_extension.o
-	$(CXX) src/ntt_goldilocks.cpp -fPIC  -g -Wall -pthread -fopenmp -mavx2 -c -o ntt_goldilocks.o
+	$(CXX) -D__USE_CUDA__ src/ntt_goldilocks.cpp -fPIC  -g -Wall -pthread -fopenmp -mavx2 -c -Icryptography_cuda/depends/blst/src -I/usr/local/cuda/include -Icryptography_cuda/cuda -o ntt_goldilocks.o
 	$(CXX) -D__USE_CUDA__ src/poseidon_goldilocks.cpp -fPIC -g -Wall -pthread -fopenmp -mavx2 -c -o poseidon_goldilocks.o
 	$(NVCC) -D__USE_CUDA__ -DFEATURE_GOLDILOCKS -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 cryptography_cuda/src/lib.cu -Icryptography_cuda/cuda -Icryptography_cuda/depends/blst/src -arch=$(CUDA_ARCH) -g -dc --output-file ntt_gpu.o
 	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) -g -dc --output-file poseidon_goldilocks_gpu.o
@@ -87,6 +87,18 @@ runnttcpu: testscpu
 
 runnttgpu: testsgpu
 	./testsgpu --gtest_filter=GOLDILOCKS_TEST.extendePol_cuda
+
+runrp1: testscpu
+	./testscpu --gtest_filter=GOLDILOCKS_TEST.rp1
+
+runrp2: testscpu
+	./testscpu --gtest_filter=GOLDILOCKS_TEST.rp2
+
+runintt: testscpu
+	./testscpu --gtest_filter=GOLDILOCKS_TEST.intt
+
+runinttgpu: testsgpu
+	./testsgpu --gtest_filter=GOLDILOCKS_TEST.intt_cuda
 
 benchcpu: benchs/bench.cpp $(ALLSRCS)
 	$(CXX) benchs/bench.cpp src/*.cpp -lbenchmark -lpthread -lgmp  -std=c++17 -Wall -pthread -fopenmp -mavx2 -O3 -o $@
