@@ -382,47 +382,11 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
 #ifdef __USE_CUDA__
 void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock)
 {
-    NTT_Goldilocks ntt_extension(N_Extended, nThreads, N_Extended / N);
-
-    Goldilocks::Element *tmp = NULL;
-    if (buffer == NULL)
-    {
-        tmp = (Goldilocks::Element *)malloc(N_Extended * ncols * sizeof(Goldilocks::Element));
-    }
-    else
-    {
-        tmp = buffer;
-    }
-    // TODO: Pre-compute r
-    computeR(N);
-
-    //INTT(output, input, N, ncols, tmp, nphase, nblock, true);
-//    printf("\nINTT result:\n");
-//    printf("[");
-//    for (uint j = 0; j < N_Extended * ncols; j++)
-//    {
-//        printf("%lu, ", Goldilocks::toU64(output[j]));
-//    }
-//    printf("]\n");
-    //ntt_extension.reversePermutation(tmp, output, N_Extended, 0, ncols, ncols);
-//    printf("\nafter reversePermutation:\n");
-//    printf("[");
-//    for (uint j = 0; j < N_Extended * ncols; j++)
-//    {
-//        printf("%lu, ", Goldilocks::toU64(tmp[j]));
-//    }
-//    printf("]\n");
-    //Goldilocks::parcpy(output, tmp, N_Extended * ncols, nThreads);
-    compute_ntt(0, (fr_t *)(uint64_t *)input, log2(N), Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
+    compute_batched_ntt(0, (fr_t *)(uint64_t *)input, log2(N), ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
     for (uint j = 0; j < N_Extended * ncols; j++){
         input[j] = input[j] * r[j];
     }
     Goldilocks::parcpy(output, input, N * ncols, nThreads);
-    compute_ntt(0, (fr_t *)(uint64_t *)output, log2(N_Extended), Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
-
-    if (buffer == NULL)
-    {
-        free(tmp);
-    }
+    compute_batched_ntt(0, (fr_t *)(uint64_t *)output, log2(N_Extended), ncols, Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
 }
 #endif // __USE_CUDA__
