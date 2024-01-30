@@ -337,7 +337,7 @@ void NTT_Goldilocks::INTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_
 #ifdef __USE_CUDA__
 void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock, bool extend)
 {
-    compute_batched_git statusntt(0, (fr_t *)(uint64_t *)src, log2(size), ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
+    compute_batched_ntt(0, (fr_t *)(uint64_t *)src, log2(size), ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
     if (extend) {
 #pragma omp parallel for schedule(static)
         for (u_int64_t i = 0; i < ncols; i++) {
