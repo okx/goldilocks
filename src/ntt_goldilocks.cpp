@@ -335,13 +335,19 @@ void NTT_Goldilocks::INTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_
     NTT(dst_, src, size, ncols, buffer, nphase, nblock, true, extend);
 }
 #ifdef __USE_CUDA__
-void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *src, u_int64_t size, bool extend)
+void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock, bool extend)
 {
-    compute_ntt(0, (fr_t *)(uint64_t *)src, log2(size), Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
+    compute_batch_ntt(0, (fr_t *)(uint64_t *)src, log2(size), ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
     if (extend) {
-        for (u_int64_t i = 0; i < size; i++) {
-            src[i] = src[i] * r[i];
+#pragma omp parallel for schedule(static)
+        for (u_int64_t i = 0; i < ncols; i++) {
+            for (u_int64_t j = 0; j < size; j++) {
+                src[i*size+j] = src[i*size+j] * r[j];
+            }
         }
+    }
+    if (dst != NULL && dst != src) {
+      Goldilocks::parcpy(dst, src, size * ncols, nThreads)
     }
 
 }
@@ -382,11 +388,7 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
 #ifdef __USE_CUDA__
 void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock)
 {
-    compute_batched_ntt(0, (fr_t *)(uint64_t *)input, log2(N), ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
-    for (uint j = 0; j < N * ncols; j++){
-        input[j] = input[j] * r[j];
-    }
-    Goldilocks::parcpy(output, input, N * ncols, nThreads);
+    INTT_cuda(output, input, N, ncols, buffer, nphase, nblock, true);
     compute_batched_ntt(0, (fr_t *)(uint64_t *)output, log2(N_Extended), ncols, Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
 }
 #endif // __USE_CUDA__
