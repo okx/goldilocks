@@ -52,13 +52,13 @@ void NTT_Goldilocks::NTT_iters(Goldilocks::Element *dst, Goldilocks::Element *sr
         tmp = a2;
     }
     reversePermutation(tmp, src, size, offset_cols, ncols, ncols_all);
-    printf("\nafter reversePermutation:\n");
-    printf("[");
-    for (uint j = 0; j < size * ncols; j++)
-    {
-        printf("%lu, ", Goldilocks::toU64(tmp[j]));
-    }
-    printf("]\n");
+//    printf("\nafter reversePermutation:\n");
+//    printf("[");
+//    for (uint j = 0; j < size * ncols; j++)
+//    {
+//        printf("%lu, ", Goldilocks::toU64(tmp[j]));
+//    }
+//    printf("]\n");
 
     if (iseven == false)
     {
@@ -364,13 +364,13 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
     computeR(N);
 
     INTT(output, input, N, ncols, tmp, nphase, nblock, true);
-    printf("\nINTT result:\n");
-    printf("[");
-    for (uint j = 0; j < N_Extended * ncols; j++)
-    {
-        printf("%lu, ", Goldilocks::toU64(output[j]));
-    }
-    printf("]\n");
+//    printf("\nINTT result:\n");
+//    printf("[");
+//    for (uint j = 0; j < N_Extended * ncols; j++)
+//    {
+//        printf("%lu, ", Goldilocks::toU64(output[j]));
+//    }
+//    printf("]\n");
     ntt_extension.NTT(output, output, N_Extended, ncols, tmp, nphase, nblock);
 
     if (buffer == NULL)

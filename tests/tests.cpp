@@ -2757,13 +2757,13 @@ TEST(GOLDILOCKS_TEST, extendePol_cpu)
         }
     }
 
-    printf("inputs:\n");
-    printf("[");
-    for (uint j = 0; j < FFT_SIZE * NUM_COLUMNS; j++)
-    {
-        printf("%lu, ", Goldilocks::toU64(a[j]));
-    }
-    printf("]\n");
+//    printf("inputs:\n");
+//    printf("[");
+//    for (uint j = 0; j < FFT_SIZE * NUM_COLUMNS; j++)
+//    {
+//        printf("%lu, ", Goldilocks::toU64(a[j]));
+//    }
+//    printf("]\n");
 
     ntt.extendPol(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS);
     printf("\noutputs:\n");
@@ -2841,13 +2841,13 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
         }
     }
 
-    printf("inputs:\n");
-    printf("[");
-    for (uint j = 0; j < FFT_SIZE * NUM_COLUMNS; j++)
-    {
-        printf("%lu, ", Goldilocks::toU64(a[j]));
-    }
-    printf("]\n");
+//    printf("inputs:\n");
+//    printf("[");
+//    for (uint j = 0; j < FFT_SIZE * NUM_COLUMNS; j++)
+//    {
+//        printf("%lu, ", Goldilocks::toU64(a[j]));
+//    }
+//    printf("]\n");
 
     ntt.extendPol_cuda(b, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS);
     printf("\noutputs:\n");
