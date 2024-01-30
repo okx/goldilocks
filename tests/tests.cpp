@@ -2680,7 +2680,7 @@ TEST(GOLDILOCKS_TEST, intt)
     }
     printf("]\n");
 
-    ntt.INTT(a, a, FFT_SIZE, 1, NULL, 3, 1, false);
+    ntt.INTT(a, a, FFT_SIZE, NUM_COLUMNS, NULL, 3, 1, false);
 
     printf("\noutputs:\n");
     printf("[");
@@ -2720,7 +2720,7 @@ TEST(GOLDILOCKS_TEST, intt_cuda)
         }
     }
 
-    ntt.INTT_cuda(a, FFT_SIZE, false);
+    ntt.INTT_cuda(NULL, a, FFT_SIZE, NUM_COLUMNS, NULL, 3, 1, false);
 
     printf("\noutputs:\n");
     for (uint j = 0; j < 4; j++)
