@@ -383,7 +383,7 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
 void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock)
 {
     compute_batched_ntt(0, (fr_t *)(uint64_t *)input, log2(N), ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
-    for (uint j = 0; j < N_Extended * ncols; j++){
+    for (uint j = 0; j < N * ncols; j++){
         input[j] = input[j] * r[j];
     }
     Goldilocks::parcpy(output, input, N * ncols, nThreads);
