@@ -13,7 +13,7 @@ fn random_fr() -> u64 {
     fr % 0xffffffff00000001
 }
 
-const DEFAULT_GPU: usize = 0;
+const DEFAULT_GPU: usize = 2;
 
 #[test]
 fn test_ntt_intt_gl64_self_consistency() {
@@ -131,30 +131,39 @@ fn test_ntt_batch_gl64_consistency_with_plonky2() {
 
 #[test]
 fn test_ntt_batch_intt_batch_gl64_self_consistency() {
-    let lg_domain_size: usize = 10;
+    use std::time::Instant;
+    let lg_domain_size: usize = 24;
+    let batch_size: usize = 50;
+    let start = Instant::now();
     init_twiddle_factors_rust(DEFAULT_GPU, lg_domain_size);
+    println!("init_twiddle_factors cost: {:?}", start.elapsed());
     let domain_size = 1usize << lg_domain_size;
 
-    let v1: Vec<u64> = (0..domain_size).map(|_| random_fr()).collect();
-    let v2: Vec<u64> = (0..domain_size).map(|_| random_fr()).collect();
+    let v1: Vec<u64> = (0..domain_size*batch_size).map(|_| random_fr()).collect();
+    let v2: Vec<u64> = (0..domain_size*batch_size).map(|_| random_fr()).collect();
 
     let mut gpu_buffer = v1.clone();
     // gpu_buffer.extend(v2.iter());
+    let start = Instant::now();
+    println!("start...");
     ntt_batch(
         DEFAULT_GPU,
         &mut gpu_buffer,
         NTTInputOutputOrder::NN,
-        1,
+        batch_size as u32,
         lg_domain_size,
     );
+
+    println!("ntt cost: {:?}", start.elapsed());
 
     intt_batch(
         DEFAULT_GPU,
         &mut gpu_buffer,
         NTTInputOutputOrder::NN,
-        1,
+        batch_size as u32,
         lg_domain_size,
     );
+    println!("total cost: {:?}", start.elapsed());
     assert_eq!(v1, gpu_buffer);
 
 }

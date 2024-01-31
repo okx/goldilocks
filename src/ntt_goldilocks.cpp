@@ -1,4 +1,5 @@
 #include "ntt_goldilocks.hpp"
+#include <sys/time.h>
 #ifdef __USE_CUDA__
 #include "../cryptography_cuda/src/lib.h"
 #include "../cryptography_cuda/cuda/ntt/ntt.h"
@@ -375,8 +376,8 @@ void NTT_Goldilocks::NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src
     }
 
 #pragma omp parallel for schedule(static)
-    for (u_int64_t i = 0; i < ncols; i++) {
-      for (u_int64_t j = 0; j < size; j++) {
+    for (u_int64_t j = 0; j < size; j++) {
+      for (u_int64_t i = 0; i < ncols; i++) {
         data[i*size+j] = src[j*ncols+i];
       }
     }
@@ -397,8 +398,8 @@ void NTT_Goldilocks::NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src
     }
 
 #pragma omp parallel for schedule(static)
-    for (u_int64_t i = 0; i < ncols; i++) {
-      for (u_int64_t j = 0; j < size; j++) {
+    for (u_int64_t j = 0; j < size; j++) {
+      for (u_int64_t i = 0; i < ncols; i++) {
         dst_[j*ncols+i] = data[i*size+j];
       }
     }
@@ -409,14 +410,6 @@ void NTT_Goldilocks::NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src
 
 void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, Goldilocks::Element *buffer, bool transpose, bool extend)
 {
-  //    uint64_t batch_size = ncols / 8;
-  //    uint64_t last_batch_size = ncols - batch_size * 7;
-  //#pragma omp parallel for schedule(static)
-  //    for (u_int32_t i = 0; i < 8; i++) {
-  //        u_int64_t par_ncols = i < 7? batch_size: last_batch_size;
-  //        compute_batched_ntt(i, (fr_t *)(uint64_t *)(src+batch_size*i), log2(size), par_ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
-  //    }
-
   Goldilocks::Element *data = NULL;
   if (transpose && ncols > 1) {
     if (buffer != NULL)
@@ -429,9 +422,9 @@ void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *sr
     }
 
     // transform from row-major to column-major order
-    for (u_int64_t i = 0; i < ncols; i++) {
 #pragma omp parallel for schedule(static)
-      for (u_int64_t j = 0; j < size; j++) {
+    for (u_int64_t j = 0; j < size; j++) {
+      for (u_int64_t i = 0; i < ncols; i++) {
         data[i*size+j] = src[j*ncols+i];
       }
     }
@@ -439,12 +432,20 @@ void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *sr
     data = src;
   }
 
+  //    uint64_t batch_size = ncols / 8;
+  //    uint64_t last_batch_size = ncols - batch_size * 7;
+  //#pragma omp parallel for schedule(static)
+  //    for (u_int32_t i = 0; i < 8; i++) {
+  //        u_int64_t par_ncols = i < 7? batch_size: last_batch_size;
+  //        compute_batched_ntt(i, (fr_t *)(uint64_t *)(src+batch_size*i), log2(size), par_ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
+  //    }
+
   compute_batched_ntt(DEFAULT_GPU, (fr_t *)(uint64_t *)data, log2(size), ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
 
   if (extend) {
-    for (u_int64_t i = 0; i < ncols; i++) {
 #pragma omp parallel for schedule(static)
-      for (u_int64_t j = 0; j < size; j++) {
+    for (u_int64_t j = 0; j < size; j++) {
+      for (u_int64_t i = 0; i < ncols; i++) {
         data[i*size+j] = data[i*size+j] * r[j];
       }
     }
@@ -461,9 +462,10 @@ void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *sr
       dst_ = src;
     }
 
-    for (u_int64_t i = 0; i < ncols; i++) {
+
 #pragma omp parallel for schedule(static)
-      for (u_int64_t j = 0; j < size; j++) {
+    for (u_int64_t j = 0; j < size; j++) {
+      for (u_int64_t i = 0; i < ncols; i++) {
         dst_[j*ncols+i] = data[i*size+j];
       }
     }
@@ -478,8 +480,13 @@ void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *sr
 
 void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, bool transpose)
 {
+  if (dst == NULL) {
+      dst = src;
+  }
   Goldilocks::Element *data = NULL;
   if (transpose && ncols > 1) {
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
     if (buffer != NULL)
     {
       data = buffer;
@@ -490,12 +497,17 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
     }
 
     // transform from row-major to column-major order
-    for (u_int64_t i = 0; i < ncols; i++) {
 #pragma omp parallel for schedule(static)
-      for (u_int64_t j = 0; j < N; j++) {
+    for (u_int64_t j = 0; j < N; j++) {
+      for (u_int64_t i = 0; i < ncols; i++) {
         data[i*N+j] = src[j*ncols+i];
       }
     }
+    gettimeofday(&end, NULL);
+    long seconds = end.tv_sec - start.tv_sec;
+    long microseconds = end.tv_usec - start.tv_usec;
+    long elapsed = seconds*1000 + microseconds/1000;
+    std::cout << "transpose1 Elapsed time: " << elapsed << " ms\n";
   } else {
     data = src;
   }
@@ -533,26 +545,25 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
 
   Goldilocks::Element *dst_ = NULL;
   if (transpose && ncols > 1) {
-    if (dst != NULL && dst != src)
-    {
-      dst_ = dst;
-    }
-    else
-    {
-      dst_ = src;
-    }
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
 
-    for (u_int64_t i = 0; i < ncols; i++) {
 #pragma omp parallel for schedule(static)
-      for (u_int64_t j = 0; j < N_Extended; j++) {
-        dst_[j*ncols+i] = data[i*N_Extended+j];
+    for (u_int64_t j = 0; j < N_Extended; j++) {
+      for (u_int64_t i = 0; i < ncols; i++) {
+        dst[j*ncols+i] = data[i*N_Extended+j];
       }
     }
+    gettimeofday(&end, NULL);
+    long seconds = end.tv_sec - start.tv_sec;
+    long microseconds = end.tv_usec - start.tv_usec;
+    long elapsed = seconds*1000 + microseconds/1000;
+    std::cout << "transpose2 Elapsed time: " << elapsed << " ms\n";
 
     if (buffer == NULL) {
       free(data);
     }
-  } else if (dst != NULL && dst != src) {
+  } else if (dst != src) {
     Goldilocks::parcpy(dst, src, N_Extended * ncols, nThreads);
   }
 }
