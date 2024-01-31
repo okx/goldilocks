@@ -61,6 +61,7 @@ public:
 
 #ifdef __USE_CUDA__
     void static merkletree_cuda(Goldilocks::Element *tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, int nThreads = 0, uint64_t dim = 1);
+    void static merkletree_cuda_gpudata(Goldilocks::Element *tree, uint64_t *gpu_input, uint64_t num_cols, uint64_t num_rows, int nThreads = 0, uint64_t dim = 1);
 #endif
 
 #ifdef __AVX512__

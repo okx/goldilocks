@@ -13,15 +13,15 @@
 // - the first 6 elements (each of 8 bytes) are: nrows (or size), ncols, nphase, nblock, inverse, extend
 // - the next nrows * ncols elements (each of 8 bytes) are the actual data
 Goldilocks::Element *read_file(char *fname, uint64_t* n_elem, uint64_t* params)
-{    
-    FILE *f = fopen(fname, "rb");    
+{
+    FILE *f = fopen(fname, "rb");
     assert(f != NULL);
-    assert(6 == fread(params, sizeof(uint64_t), 6, f));    
+    assert(6 == fread(params, sizeof(uint64_t), 6, f));
     *n_elem = params[0] * params[1];
     uint64_t total_elem = *n_elem;
 
     Goldilocks::Element *data = (Goldilocks::Element*)malloc(total_elem * sizeof( Goldilocks::Element));
-    assert(data != NULL);    
+    assert(data != NULL);
     size_t read_size = 256 * 1024 * 1024;
     size_t read_elem = read_size / sizeof(Goldilocks::Element);
     size_t idx = 0;
@@ -76,7 +76,7 @@ Goldilocks::Element *random_data(size_t total_elem)
     srand(0);
 
 #pragma omp parallel for
-    for (size_t i = 0; i < total_elem; i++) 
+    for (size_t i = 0; i < total_elem; i++)
     {
         data[i] = Goldilocks::fromS32(rand());
     }
@@ -92,7 +92,7 @@ int comp_output(Goldilocks::Element *in, Goldilocks::Element *ref, size_t nelem)
     {
         if (in[i].fe != ref[i].fe)
         {
-            printf("Data are different at index %lu\n", i);
+            printf("!!! Data are different at index %lu\n", i);
             return 0;
         }
     }
@@ -104,7 +104,7 @@ void test(char* path, int testId) {
     printf("Running for test id %d\n", testId);
 
     struct timeval start, end;
-    
+
     char ifilename[64];
     char ofilename[64];
     sprintf(ifilename, "%s/ntt_src-0.bin", path);
@@ -113,7 +113,7 @@ void test(char* path, int testId) {
 
     uint64_t iparams[6] = {0};
     // uint64_t oparams[6] = {0};
-    uint64_t ine, one;    
+    uint64_t ine, one;
     Goldilocks::Element * idata = read_file(ifilename, &ine, iparams);
     printf("Number of input elements %lu\n", ine);
     Goldilocks::Element *odata = (Goldilocks::Element*)malloc(2 * ine * sizeof(Goldilocks::Element));
@@ -128,7 +128,7 @@ void test(char* path, int testId) {
     ntt.setUseGPU(true);
 #endif
     ntt.computeR(iparams[0]);
-    
+
     gettimeofday(&start, NULL);
 #ifdef __USE_CUDA__
     // ntt.INTT_MultiGPU(odata, idata, iparams[0], iparams[1], tmp, iparams[2], true);
@@ -139,7 +139,7 @@ void test(char* path, int testId) {
 #endif
     gettimeofday(&end, NULL);
     uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
-    printf("INTT CPU time: %lu ms\n", t / 1000);    
+    printf("INTT CPU time: %lu ms\n", t / 1000);
 
 /*
     memset(tmp, 0, 2 * ine * sizeof(Goldilocks::Element));
@@ -149,19 +149,19 @@ void test(char* path, int testId) {
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("INTT GPU time: %lu ms\n", t / 1000);
-*/    
+*/
     free(idata);
     free(tmp);
-   
+
     one = 2 * ine;
     Goldilocks::Element * orefdata = read_file_v2(ofilename, one);
-    printf("Number of output elements %lu\n", one);  
+    printf("Number of output elements %lu\n", one);
     comp_output(odata, orefdata, one);
-    
+
     free(orefdata);
     free(gpu_odata);
     free(odata);
-    
+
     printf("Test id %d done.\n", testId);
 }
 
@@ -169,7 +169,7 @@ void test_random() {
     printf("Running test with random data...\n");
 
     struct timeval start, end;
-    
+
     uint64_t ncols = 32;
     uint64_t ine = 1 << 23;
     uint64_t one = 1 << 24; // blowup factor 2
@@ -190,18 +190,19 @@ void test_random() {
     ntt.setUseGPU(true);
 #endif
     ntt.computeR(n_ext);
-    
+
     gettimeofday(&start, NULL);
-    ntt.extendPol(odata, idata, n_ext, n, ncols, tmp);
-    // ntt.NTT(odata, idata, n, ncols, tmp, 3, 1, false, true);
+    // ntt.extendPol(odata, idata, n_ext, n, ncols, tmp);
+    ntt.NTT(odata, idata, n, ncols, tmp, 3, 1, false, true);
     // ntt.INTT(odata, odata, n_ext, ncols, tmp);
     gettimeofday(&end, NULL);
     uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("Extend on CPU time: %lu ms\n", t / 1000);
 
     gettimeofday(&start, NULL);
-    ntt.Extend_GPU(gpu_odata, idata, n, n_ext, ncols, tmp);
+    // ntt.Extend_GPU(gpu_odata, idata, n, n_ext, ncols, tmp);
     // ntt.extendPol(gpu_odata, idata, n_ext, n, ncols, tmp);
+    ntt.NTT_BatchGPU(gpu_odata, idata, n, ncols, 24, tmp, 3, false, true);
     // ntt.NTT_GPU(gpu_odata, idata, n, ncols, tmp, 3, false, true);
     // ntt.INTT_GPU(gpu_odata, gpu_odata, n_ext, ncols, tmp);
     gettimeofday(&end, NULL);
@@ -210,17 +211,125 @@ void test_random() {
 
     free(idata);
     free(tmp);
-   
-    printf("Number of output elements %lu\n", one);  
+
+    printf("Number of output elements %lu\n", one);
     comp_output(odata, gpu_odata, one);
-        
+
     free(gpu_odata);
     free(odata);
-    
+
+    printf("Test done.\n");
+}
+
+void test_lde_no_merkle_random() {
+    printf("Running LDE only on random data...\n");
+
+    struct timeval start, end;
+
+    uint64_t ncols = 32;
+    uint64_t ine = 1 << 23;
+    uint64_t one = 1 << 24; // blowup factor 2
+    uint64_t n = ine / ncols;
+    uint64_t n_ext = one / ncols;
+
+    Goldilocks::Element * idata = random_data(ine);
+    printf("Number of input elements %lu\n", ine);
+    Goldilocks::Element *odata1 = (Goldilocks::Element*)malloc(one * sizeof(Goldilocks::Element));
+    assert(odata1 != NULL);
+    Goldilocks::Element *tmp = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
+    assert(tmp != NULL);
+    Goldilocks::Element * odata2 = (Goldilocks::Element*)malloc(one * sizeof(Goldilocks::Element));
+    assert(odata2 != NULL);
+
+    NTT_Goldilocks ntt(n_ext);
+#ifdef __USE_CUDA__
+    ntt.setUseGPU(true);
+#endif
+    ntt.computeR(n_ext);
+
+    gettimeofday(&start, NULL);
+    ntt.LDE_MerkleTree_CPU(odata1, idata, n, n_ext, ncols, tmp, false); // false means do not build the Merkle Tree
+    gettimeofday(&end, NULL);
+    uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("Extend on CPU time: %lu ms\n", t / 1000);
+
+    gettimeofday(&start, NULL);
+    ntt.LDE_MerkleTree_GPU(odata2, idata, n, n_ext, ncols, tmp, false); // false means do not build the Merkle Tree
+    gettimeofday(&end, NULL);
+    t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("Extend on GPU time: %lu ms\n", t / 1000);
+
+    free(idata);
+    free(tmp);
+
+    printf("Number of output elements %lu\n", one);
+    comp_output(odata1, odata2, one);
+
+    free(odata1);
+    free(odata2);
+
+    printf("Test done.\n");
+}
+
+void test_lde_merkle_random() {
+    printf("Running LDE + Merkle Tree on random data...\n");
+
+    struct timeval start, end;
+
+    uint64_t ncols = 32;
+    uint64_t ine = 1 << 23;
+    uint64_t one = 1 << 24; // blowup factor 2
+    uint64_t n = ine / ncols;
+    uint64_t n_ext = one / ncols;
+    uint64_t n_tree_elem = 2 * n_ext - 1;
+    uint64_t tree_size = n_tree_elem * 4;
+
+    Goldilocks::Element * idata = random_data(ine);
+    printf("Number of input elements %lu\n", ine);
+    printf("Tree size %lu\n", tree_size);
+    Goldilocks::Element *tree1 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
+    assert(tree1 != NULL);
+    Goldilocks::Element *tmp = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
+    assert(tmp != NULL);
+    Goldilocks::Element * tree2 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
+    assert(tree2 != NULL);
+
+    NTT_Goldilocks ntt(n_ext);
+#ifdef __USE_CUDA__
+    ntt.setUseGPU(true);
+#endif
+    ntt.computeR(n_ext);
+
+    gettimeofday(&start, NULL);
+    ntt.LDE_MerkleTree_CPU(tree1, idata, n, n_ext, ncols, tmp);
+    gettimeofday(&end, NULL);
+    uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("Extend on CPU time: %lu ms\n", t / 1000);
+
+    gettimeofday(&start, NULL);
+    ntt.LDE_MerkleTree_GPU(tree2, idata, n, n_ext, ncols, tmp);
+    gettimeofday(&end, NULL);
+    t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("Extend on GPU time: %lu ms\n", t / 1000);
+
+    free(idata);
+    free(tmp);
+
+    printf("Number of output elements %lu\n", tree_size);
+    comp_output(tree1, tree2, tree_size);
+
+    free(tree1);
+    free(tree2);
+
     printf("Test done.\n");
 }
 
 int main(int argc, char **argv) {
     // test((char*)"/data/workspace/dumi/x1-prover", 0);
+
     test_random();
+
+    test_lde_no_merkle_random();
+
+    test_lde_merkle_random();
 }
