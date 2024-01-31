@@ -9,11 +9,11 @@
 #include <immintrin.h>
 #include <sys/time.h>
 
-#define LOG_FFT_SIZE 22
+#define LOG_FFT_SIZE 23
 #define FFT_SIZE (uint64_t(1 << LOG_FFT_SIZE))
 #define NUM_REPS 5
 #define BLOWUP_FACTOR 1
-#define NUM_COLUMNS 2
+#define NUM_COLUMNS 20
 #define NPHASES 4
 #define NCOLS_HASH 128
 #define NROWS_HASH (1 << 6)
@@ -2736,19 +2736,19 @@ TEST(GOLDILOCKS_TEST, intt_cuda)
     ASSERT_EQ(a[i], b[i]);
   }
 
-//  printf("\noutputs:\n");
-//  printf("[");
-//  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
-//  {
-//    printf("%lu, ", Goldilocks::toU64(a[j]));
-//  }
-//  printf("]\n");
-//  printf("[");
-//  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
-//  {
-//    printf("%lu, ", Goldilocks::toU64(b[j]));
-//  }
-//  printf("]\n");
+  //  printf("\noutputs:\n");
+  //  printf("[");
+  //  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
+  //  {
+  //    printf("%lu, ", Goldilocks::toU64(a[j]));
+  //  }
+  //  printf("]\n");
+  //  printf("[");
+  //  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
+  //  {
+  //    printf("%lu, ", Goldilocks::toU64(b[j]));
+  //  }
+  //  printf("]\n");
 
   free(a);
   free(b);
@@ -2839,13 +2839,13 @@ TEST(GOLDILOCKS_TEST, ntt_cpu)
 
   ntt.NTT(NULL, a, FFT_SIZE, NUM_COLUMNS, NULL, 3, 1, false, false);
 
-//  printf("\noutputs:\n");
-//  printf("[");
-//  for (uint j = 0; j < FFT_SIZE; j++)
-//  {
-//    printf("%lu, ", Goldilocks::toU64(a[j]));
-//  }
-//  printf("]\n");
+  //  printf("\noutputs:\n");
+  //  printf("[");
+  //  for (uint j = 0; j < FFT_SIZE; j++)
+  //  {
+  //    printf("%lu, ", Goldilocks::toU64(a[j]));
+  //  }
+  //  printf("]\n");
 
   free(a);
   free(b);
@@ -2892,13 +2892,13 @@ TEST(GOLDILOCKS_TEST, extendePol_cpu)
   long elapsed = seconds*1000 + microseconds/1000;
 
   std::cout << "Elapsed time: " << elapsed << " ms\n";
-//  printf("\noutputs:\n");
-//  printf("[");
-//  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS; j++)
-//  {
-//    printf("%lu, ", Goldilocks::toU64(a[j]));
-//  }
-//  printf("]\n");
+  //  printf("\noutputs:\n");
+  //  printf("[");
+  //  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS; j++)
+  //  {
+  //    printf("%lu, ", Goldilocks::toU64(a[j]));
+  //  }
+  //  printf("]\n");
 
   //    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-4) * NUM_COLUMNS]), 0X97FACF1FAD53863F);
   //    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-3) * NUM_COLUMNS]), 0X629DBA77EEE23EB8);
@@ -2951,10 +2951,10 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
 
   NTT_Goldilocks ntt(FFT_SIZE);
   ntt.computeR(FFT_SIZE);
-  printf("calculate twiddle factors\n");
-  ntt.init_twiddle_factors_cuda(0, LOG_FFT_SIZE);
+  printf("calculate twiddle factors: %d\n", DEFAULT_GPU);
+  ntt.init_twiddle_factors_cuda(DEFAULT_GPU, LOG_FFT_SIZE);
   printf("calculate twiddle factors2\n");
-  ntt.init_twiddle_factors_cuda(0, LOG_FFT_SIZE+BLOWUP_FACTOR);
+  ntt.init_twiddle_factors_cuda(DEFAULT_GPU, LOG_FFT_SIZE+BLOWUP_FACTOR);
   //    #pragma omp parallel for schedule(static)
   //    for (u_int32_t i = 0; i < 8; i++) {
   //        ntt.init_twiddle_factors_cuda(i, LOG_FFT_SIZE);
