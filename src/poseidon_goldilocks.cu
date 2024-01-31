@@ -126,6 +126,7 @@ void init_gpu_const()
         CHECKCUDAERR(cudaMemcpyToSymbol(GPU_S, PoseidonGoldilocksConstants::S, 507 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
         init_gl64_const<<<1, 1>>>();
     }
+    CHECKCUDAERR(cudaSetDevice(0));
 }
 
 __device__ void hash_full_result_seq(gl64_t *state, const gl64_t *input)

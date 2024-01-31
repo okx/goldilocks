@@ -110,19 +110,22 @@ int test(char* path, int testId) {
     char ofilename[64];
     sprintf(ifilename, "%s/ntt_src-0.bin", path);
     // sprintf(ofilename, "%s/ntt_src-1.bin", path);
-    sprintf(ofilename, "%s/leaves-00.bin", path);
+    // sprintf(ofilename, "%s/leaves-00.bin", path);
+    sprintf(ofilename, "%s/tree-00.bin", path);
 
     uint64_t iparams[6] = {0};
     // uint64_t oparams[6] = {0};
     uint64_t ine, one;
     Goldilocks::Element * idata = read_file(ifilename, &ine, iparams);
     printf("Number of input elements %lu\n", ine);
-    Goldilocks::Element *odata = (Goldilocks::Element*)malloc(2 * ine * sizeof(Goldilocks::Element));
-    assert(odata != NULL);
+    uint64_t tree_size = (2 * iparams[0] - 1) * 4;
+    printf("Number of tree elements %lu\n", tree_size);
+    Goldilocks::Element *tree1 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
+    assert(tree1 != NULL);
     Goldilocks::Element *tmp = (Goldilocks::Element *)malloc(2 * ine * sizeof(Goldilocks::Element));
     assert(tmp != NULL);
-    Goldilocks::Element * gpu_odata = (Goldilocks::Element*)malloc(ine * sizeof(Goldilocks::Element));
-    assert(gpu_odata != NULL);
+    Goldilocks::Element * tree2 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
+    assert(tree2 != NULL);
 
     NTT_Goldilocks ntt(iparams[0]);
 #ifdef __USE_CUDA__
@@ -130,38 +133,33 @@ int test(char* path, int testId) {
 #endif
     ntt.computeR(iparams[0]);
 
-    gettimeofday(&start, NULL);
-#ifdef __USE_CUDA__
-    // ntt.INTT_MultiGPU(odata, idata, iparams[0], iparams[1], tmp, iparams[2], true);
-    ntt.Extend_MultiGPU(odata, idata, iparams[0], 2*iparams[0], iparams[1]);
-#else
-    // ntt.INTT(odata, idata, iparams[0], iparams[1], tmp, iparams[2], iparams[3], true);
-    ntt.extendPol(odata, idata, 2*iparams[0], iparams[0], iparams[1], tmp, iparams[2], iparams[3]);
-#endif
+    gettimeofday(&start, NULL);    
+    ntt.extendPol(tmp, idata, 2*iparams[0], iparams[0], iparams[1], NULL, iparams[2], iparams[3]);
+    PoseidonGoldilocks::merkletree_avx(tree1, tmp, iparams[1], 2*iparams[0]);
     gettimeofday(&end, NULL);
     uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
-    printf("INTT CPU time: %lu ms\n", t / 1000);
+    printf("LDE + Merkle Tree on CPU time: %lu ms\n", t / 1000);
 
-/*
     memset(tmp, 0, 2 * ine * sizeof(Goldilocks::Element));
     ntt.setUseGPU(true);
     gettimeofday(&start, NULL);
-    ntt.INTT(gpu_odata, idata, iparams[0], iparams[1], tmp, iparams[2], iparams[3], true);
+    ntt.INTT(tmp, idata, iparams[0], iparams[1], NULL, 3, 1, true);
+    ntt.NTT_BatchGPU(tree2, tmp, 2*iparams[0], iparams[1], 80, NULL, 3, false, false, true);
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
-    printf("INTT GPU time: %lu ms\n", t / 1000);
-*/
+    printf("LDE + Merkle Tree on GPU time: %lu ms\n", t / 1000);
+
     free(idata);
     free(tmp);
 
     one = 2 * ine;
     Goldilocks::Element * orefdata = read_file_v2(ofilename, one);
     printf("Number of output elements %lu\n", one);
-    int ret = comp_output(odata, orefdata, one);
+    int ret = comp_output(tree1, tree2, tree_size);
 
     free(orefdata);
-    free(gpu_odata);
-    free(odata);
+    free(tree1);
+    free(tree2);
 
     printf("Test id %d done.\n\n", testId);
     return ret;

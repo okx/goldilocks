@@ -507,9 +507,9 @@ void NTT_Goldilocks::NTT_GPU_iters(Goldilocks::Element *dst, Goldilocks::Element
     }
 }
 
-void NTT_Goldilocks::NTT_GPU_iters_onGPU(Goldilocks::Element *dst, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, u_int64_t nphase, Goldilocks::Element *aux, bool inverse, bool extend, uint64_t aux_size, bool copyFromGPU)
+void NTT_Goldilocks::NTT_GPU_iters_onGPU(Goldilocks::Element *dst, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, u_int64_t nphase, Goldilocks::Element *aux, bool inverse, bool extend, uint64_t aux_size, bool copyFromGPU, int gpu_id)
 {
-    int gpu_id = 0;
+    
     gl64_t *a = gpu_a[gpu_id];
     gl64_t *a2 = gpu_a2[gpu_id];
     gl64_t *tmp;
@@ -577,7 +577,7 @@ void NTT_Goldilocks::NTT_GPU_iters_onGPU(Goldilocks::Element *dst, u_int64_t siz
     }
 }
 
-void NTT_Goldilocks::NTT_MultiGPU_iters(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, u_int64_t nphase, Goldilocks::Element *aux, bool inverse, bool extend, uint64_t aux_size, uint64_t aux_size_last, int ngpus, int gpu_id)
+void NTT_Goldilocks::NTT_MultiGPU_iters(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, u_int64_t nphase, Goldilocks::Element *aux, bool inverse, bool extend, uint64_t aux_size, uint64_t aux_size_last, int ngpus, int gpu_id, bool copyToGPU, bool copyFromGPU)
 {
     Goldilocks::Element *dst_;
     if (dst != NULL)
@@ -625,8 +625,11 @@ void NTT_Goldilocks::NTT_MultiGPU_iters(Goldilocks::Element *dst, Goldilocks::El
 
     CHECKCUDAERR(cudaSetDevice(gpu_id));
     uint64_t actual_size = (gpu_id == ngpus - 1) ? aux_size_last : aux_size;
+    if (copyToGPU)
+    {    
     CHECKCUDAERR(cudaMemcpyAsync(gpu_a[gpu_id], (uint64_t *)a, actual_size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
     CHECKCUDAERR(cudaMemcpyAsync(gpu_a2[gpu_id], (uint64_t *)a2, actual_size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
+    }
 
 #ifdef GPU_TIMING
     CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
@@ -666,13 +669,15 @@ void NTT_Goldilocks::NTT_MultiGPU_iters(Goldilocks::Element *dst, Goldilocks::El
     printf("NTT_MultiGPU_iters: kernel on GPU %d took: %lu ms\n", gpu_id, t / 1000);
 #endif
 
+    if (copyFromGPU)
+    {
     if (a != dst_)
     {
         a = dst_;
     }
-
     CHECKCUDAERR(cudaMemcpyAsync((uint64_t *)a, gpu_a[gpu_id], actual_size * sizeof(uint64_t), cudaMemcpyDeviceToHost, gpu_stream[gpu_id]));
     CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
+    }
 
 #ifdef GPU_TIMING
     gettimeofday(&end, NULL);
@@ -932,6 +937,7 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     }
     uint64_t aux_size = size * ncols_batch;
 
+    printf("*** Batch GPU\n");
     printf("Number of columns: %lu\n", ncols);
     printf("Number of batches: %lu\n", nbatches);
     printf("Cols per batch: %lu\n", ncols_batch);
@@ -960,7 +966,7 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     if (buildMerkleTree)
     {
         assert(ncols_batch % 8 == 0);   // ncols per batch should be multiple of 8 which is Poseidon RATE
-        CHECKCUDAERR(cudaMalloc(&gpu_poseidon_state, size * SPONGE_WIDTH * sizeof(uint64_t)));
+        CHECKCUDAERR(cudaMalloc(&gpu_poseidon_state, size * SPONGE_WIDTH * sizeof(uint64_t)));        
         PoseidonGoldilocks::partial_hash_init_gpu((uint64_t*)gpu_poseidon_state, size);
     }
     CHECKCUDAERR(cudaMalloc(&gpu_a[gpu_id], aux_size * sizeof(uint64_t)));
@@ -968,14 +974,32 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     CHECKCUDAERR(cudaMemcpyAsync(gpu_roots[gpu_id], (uint64_t *)roots, nRoots * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
     CHECKCUDAERR(cudaMemcpyAsync(gpu_powTwoInv[gpu_id], (uint64_t *)powTwoInv, (s + 1) * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
 
+#ifdef GPU_TIMING
+    struct timeval start1;
+    gettimeofday(&start1, NULL);
+#endif
     for (int b = 0; b < nbatches; b++)
     {
-        uint64_t aux_ncols = (b == nbatches - 1 && ncols_last_batch > 0) ? ncols_last_batch : ncols_batch;
-
+        printf("Batch %d\n", b);
+#ifdef GPU_TIMING
+        struct timeval start;
+        gettimeofday(&start, NULL);
+#endif
+        uint64_t aux_ncols = (b == nbatches - 1 && ncols_last_batch > 0) ? ncols_last_batch : ncols_batch;        
         if (buildMerkleTree)
         {
             NTT_Goldilocks::NTT_GPU_iters(dst_, src, size, b * ncols_batch, aux_ncols, ncols, nphase, aux, inverse, extend, aux_size, true, false);
+#ifdef GPU_TIMING
+        struct timeval start2;
+        gettimeofday(&start2, NULL);
+#endif            
             PoseidonGoldilocks::partial_hash_gpu((uint64_t *)gpu_a[gpu_id], aux_ncols, size, (uint64_t *)gpu_poseidon_state);
+#ifdef GPU_TIMING
+        struct timeval end2;
+        gettimeofday(&end2, NULL);
+        uint64_t t2 = end2.tv_sec * 1000000 + end2.tv_usec - start2.tv_sec * 1000000 - start2.tv_usec;
+        printf("NTT_BatchGPU: partial Poseidon took: %lu ms\n", t2 / 1000);
+#endif
         }
         else
         {
@@ -987,19 +1011,33 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
                 std::memcpy(&dst[offset2], &(dst_[ie * aux_ncols]), aux_ncols * sizeof(Goldilocks::Element));
             }
         }
-    }
-
 #ifdef GPU_TIMING
-    struct timeval end;
-    gettimeofday(&end, NULL);
-    uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
-    printf("NTT_BatchGPU: CPU memcpy took: %lu ms\n", t / 1000);
+        struct timeval end;
+        gettimeofday(&end, NULL);
+        uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+        printf("NTT_BatchGPU: one batch took: %lu ms\n", t / 1000);
+#endif
+    }
+#ifdef GPU_TIMING
+    struct timeval end1;
+    gettimeofday(&end1, NULL);
+    uint64_t t = end1.tv_sec * 1000000 + end1.tv_usec - start1.tv_sec * 1000000 - start1.tv_usec;
+    printf("NTT_BatchGPU: all batches took: %lu ms\n", t / 1000);
+    gettimeofday(&start1, NULL);
 #endif
 
     if (buildMerkleTree)
     {
         PoseidonGoldilocks::merkletree_cuda_from_partial(dst, (uint64_t*)gpu_poseidon_state, ncols, size);
     }
+
+#ifdef GPU_TIMING    
+    gettimeofday(&end1, NULL);
+    t = end1.tv_sec * 1000000 + end1.tv_usec - start1.tv_sec * 1000000 - start1.tv_usec;
+    printf("NTT_BatchGPU: Merkle Tree building took: %lu ms\n", t / 1000);
+    gettimeofday(&end1, NULL);
+#endif
+
 
     CHECKCUDAERR(cudaSetDevice(gpu_id));
     CHECKCUDAERR(cudaStreamDestroy(gpu_stream[gpu_id]));
@@ -1263,9 +1301,10 @@ void NTT_Goldilocks::Extend_MultiGPU(Goldilocks::Element *dst, Goldilocks::Eleme
     for (uint32_t d = 0; d < nDevices; d++)
     {
         uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
-        NTT_Goldilocks::NTT_MultiGPU_iters(dst_[d], src, size, d * ncols_per_gpu, aux_ncols, ncols, nphase, aux[d], true, true, aux_size, aux_size_last, nDevices, d);
+        NTT_Goldilocks::NTT_MultiGPU_iters(dst_[d], src, size, d * ncols_per_gpu, aux_ncols, ncols, nphase, aux[d], true, true, aux_size, aux_size_last, nDevices, d, true, false);
     }
 
+/*
 #ifdef GPU_TIMING
     printf("Extend_MultiGPU: copy back after INTT ...\n");
     gettimeofday(&start, NULL);
@@ -1287,13 +1326,15 @@ void NTT_Goldilocks::Extend_MultiGPU(Goldilocks::Element *dst, Goldilocks::Eleme
     uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("Extend_MultiGPU: CPU memcpy took: %lu ms\n", t / 1000);
 #endif
+*/
 
     // NTT on the extended domain (inverse and extend set to false)
 #pragma omp parallel for num_threads(nDevices)
     for (uint32_t d = 0; d < nDevices; d++)
     {
         uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
-        NTT_Goldilocks::NTT_MultiGPU_iters(dst_[d], dst, ext_size, d * ncols_per_gpu, aux_ncols, ncols, nphase, aux[d], false, false, aux_ext_size, aux_ext_size_last, nDevices, d);
+        // NTT_Goldilocks::NTT_MultiGPU_iters(dst_[d], dst, ext_size, d * ncols_per_gpu, aux_ncols, ncols, nphase, aux[d], false, false, aux_ext_size, aux_ext_size_last, nDevices, d, false, true);
+        NTT_Goldilocks::NTT_GPU_iters_onGPU(dst_[d], ext_size, d * ncols_per_gpu, aux_ncols, ncols, nphase, aux[d], false, false, aux_ext_size, true, d);
     }
 
 #ifdef GPU_TIMING
@@ -1311,8 +1352,9 @@ void NTT_Goldilocks::Extend_MultiGPU(Goldilocks::Element *dst, Goldilocks::Eleme
         }
     }
 #ifdef GPU_TIMING
+    struct timeval end;
     gettimeofday(&end, NULL);
-    t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("Extend_MultiGPU: CPU memcpy took: %lu ms\n", t / 1000);
 #endif
 
