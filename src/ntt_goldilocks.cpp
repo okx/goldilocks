@@ -530,9 +530,13 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
 
   gettimeofday(&start, NULL);
   // NEVER do it in parallel!
-  for (u_int64_t i = ncols-1; i > 0; i--) {
-    std::memcpy(&data[i * N_Extended], &data[i * N], N * sizeof(Goldilocks::Element));
+  for (u_int64_t j = ncols; j > 0; j/=2) {
+#pragma omp parallel for schedule(static)
+    for (u_int64_t i = j-1; i >= j/2; i--) {
+      std::memcpy(&data[i * N_Extended], &data[i * N], N * sizeof(Goldilocks::Element));
+    }
   }
+
 
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
