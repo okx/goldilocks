@@ -2736,19 +2736,19 @@ TEST(GOLDILOCKS_TEST, intt_cuda)
     ASSERT_EQ(a[i], b[i]);
   }
 
-  printf("\noutputs:\n");
-  printf("[");
-  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
-  {
-    printf("%lu, ", Goldilocks::toU64(a[j]));
-  }
-  printf("]\n");
-  printf("[");
-  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
-  {
-    printf("%lu, ", Goldilocks::toU64(b[j]));
-  }
-  printf("]\n");
+//  printf("\noutputs:\n");
+//  printf("[");
+//  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
+//  {
+//    printf("%lu, ", Goldilocks::toU64(a[j]));
+//  }
+//  printf("]\n");
+//  printf("[");
+//  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
+//  {
+//    printf("%lu, ", Goldilocks::toU64(b[j]));
+//  }
+//  printf("]\n");
 
   free(a);
   free(b);
@@ -2839,13 +2839,13 @@ TEST(GOLDILOCKS_TEST, ntt_cpu)
 
   ntt.NTT(NULL, a, FFT_SIZE, NUM_COLUMNS, NULL, 3, 1, false, false);
 
-  printf("\noutputs:\n");
-  printf("[");
-  for (uint j = 0; j < FFT_SIZE; j++)
-  {
-    printf("%lu, ", Goldilocks::toU64(a[j]));
-  }
-  printf("]\n");
+//  printf("\noutputs:\n");
+//  printf("[");
+//  for (uint j = 0; j < FFT_SIZE; j++)
+//  {
+//    printf("%lu, ", Goldilocks::toU64(a[j]));
+//  }
+//  printf("]\n");
 
   free(a);
   free(b);
@@ -2892,13 +2892,13 @@ TEST(GOLDILOCKS_TEST, extendePol_cpu)
   long elapsed = seconds*1000 + microseconds/1000;
 
   std::cout << "Elapsed time: " << elapsed << " ms\n";
-  printf("\noutputs:\n");
-  printf("[");
-  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS; j++)
-  {
-    printf("%lu, ", Goldilocks::toU64(a[j]));
-  }
-  printf("]\n");
+//  printf("\noutputs:\n");
+//  printf("[");
+//  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS; j++)
+//  {
+//    printf("%lu, ", Goldilocks::toU64(a[j]));
+//  }
+//  printf("]\n");
 
   //    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-4) * NUM_COLUMNS]), 0X97FACF1FAD53863F);
   //    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-3) * NUM_COLUMNS]), 0X629DBA77EEE23EB8);
@@ -2994,7 +2994,7 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
   struct timeval start, end;
   gettimeofday(&start, NULL);
   printf("extendPol_cuda start...\n");
-  ntt.extendPol_cuda(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, c, false);
+  ntt.extendPol_cuda(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, c, true);
   gettimeofday(&end, NULL);
   long seconds = end.tv_sec - start.tv_sec;
   long microseconds = end.tv_usec - start.tv_usec;
