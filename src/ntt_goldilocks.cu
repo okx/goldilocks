@@ -13,7 +13,7 @@ gl64_t *gpu_a2[16];
 gl64_t *gpu_powTwoInv[16];
 gl64_t *gpu_r_[16];
 cudaStream_t gpu_stream[16];
-gl64_t *state[SPONGE_WIDTH];
+gl64_t *gpu_poseidon_state;
 
 #define GPU_TIMING
 #ifdef GPU_TIMING
@@ -917,7 +917,7 @@ void NTT_Goldilocks::NTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element 
     }
 }
 
-void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, u_int64_t ncols_batch, Goldilocks::Element *buffer, u_int64_t nphase, bool inverse, bool extend)
+void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, u_int64_t ncols_batch, Goldilocks::Element *buffer, u_int64_t nphase, bool inverse, bool extend, bool buildMerkleTree)
 {
     if (ncols == 0 || size == 0)
     {
@@ -957,6 +957,12 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
         CHECKCUDAERR(cudaMalloc(&gpu_r_[gpu_id], size * sizeof(uint64_t)));
         CHECKCUDAERR(cudaMemcpyAsync(gpu_r_[gpu_id], (uint64_t *)r_, size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
     }
+    if (buildMerkleTree)
+    {
+        assert(ncols_batch % 8 == 0);   // ncols per batch should be multiple of 8 which is Poseidon RATE
+        CHECKCUDAERR(cudaMalloc(&gpu_poseidon_state, size * SPONGE_WIDTH * sizeof(uint64_t)));
+        PoseidonGoldilocks::partial_hash_init_gpu((uint64_t*)gpu_poseidon_state, size);
+    }
     CHECKCUDAERR(cudaMalloc(&gpu_a[gpu_id], aux_size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMalloc(&gpu_a2[gpu_id], aux_size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMemcpyAsync(gpu_roots[gpu_id], (uint64_t *)roots, nRoots * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
@@ -965,13 +971,21 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     for (int b = 0; b < nbatches; b++)
     {
         uint64_t aux_ncols = (b == nbatches - 1 && ncols_last_batch > 0) ? ncols_last_batch : ncols_batch;
-        NTT_Goldilocks::NTT_GPU_iters(dst_, src, size, b * ncols_batch, aux_ncols, ncols, nphase, aux, inverse, extend, aux_size, true, true);
 
-#pragma omp parallel for schedule(static)
-        for (u_int64_t ie = 0; ie < size; ++ie)
+        if (buildMerkleTree)
         {
-            u_int64_t offset2 = ie * ncols + b * ncols_batch;
-            std::memcpy(&dst[offset2], &(dst_[ie * aux_ncols]), aux_ncols * sizeof(Goldilocks::Element));
+            NTT_Goldilocks::NTT_GPU_iters(dst_, src, size, b * ncols_batch, aux_ncols, ncols, nphase, aux, inverse, extend, aux_size, true, false);
+            PoseidonGoldilocks::partial_hash_gpu((uint64_t *)gpu_a[gpu_id], aux_ncols, size, (uint64_t *)gpu_poseidon_state);
+        }
+        else
+        {
+            NTT_Goldilocks::NTT_GPU_iters(dst_, src, size, b * ncols_batch, aux_ncols, ncols, nphase, aux, inverse, extend, aux_size, true, true);
+#pragma omp parallel for schedule(static)
+            for (u_int64_t ie = 0; ie < size; ++ie)
+            {
+                u_int64_t offset2 = ie * ncols + b * ncols_batch;
+                std::memcpy(&dst[offset2], &(dst_[ie * aux_ncols]), aux_ncols * sizeof(Goldilocks::Element));
+            }
         }
     }
 
@@ -982,6 +996,11 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     printf("NTT_BatchGPU: CPU memcpy took: %lu ms\n", t / 1000);
 #endif
 
+    if (buildMerkleTree)
+    {
+        PoseidonGoldilocks::merkletree_cuda_from_partial(dst, (uint64_t*)gpu_poseidon_state, ncols, size);
+    }
+
     CHECKCUDAERR(cudaSetDevice(gpu_id));
     CHECKCUDAERR(cudaStreamDestroy(gpu_stream[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_roots[gpu_id]));
@@ -989,6 +1008,9 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     CHECKCUDAERR(cudaFree(gpu_a2[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_powTwoInv[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_r_[gpu_id]));
+    if (buildMerkleTree) {
+        CHECKCUDAERR(cudaFree(gpu_poseidon_state));
+    }
     free(aux);
     free(dst_);
 }

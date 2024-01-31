@@ -1,5 +1,6 @@
 #include "../src/goldilocks_base_field.hpp"
 #include "../src/ntt_goldilocks.hpp"
+#include "../src/poseidon_goldilocks.hpp"
 
 #include <sys/time.h>
 #include <sys/mman.h>
@@ -100,7 +101,7 @@ int comp_output(Goldilocks::Element *in, Goldilocks::Element *ref, size_t nelem)
     return 1;
 }
 
-void test(char* path, int testId) {
+int test(char* path, int testId) {
     printf("Running for test id %d\n", testId);
 
     struct timeval start, end;
@@ -156,16 +157,17 @@ void test(char* path, int testId) {
     one = 2 * ine;
     Goldilocks::Element * orefdata = read_file_v2(ofilename, one);
     printf("Number of output elements %lu\n", one);
-    comp_output(odata, orefdata, one);
+    int ret = comp_output(odata, orefdata, one);
 
     free(orefdata);
     free(gpu_odata);
     free(odata);
 
-    printf("Test id %d done.\n", testId);
+    printf("Test id %d done.\n\n", testId);
+    return ret;
 }
 
-void test_random() {
+int test_random() {
     printf("Running test with random data...\n");
 
     struct timeval start, end;
@@ -213,15 +215,68 @@ void test_random() {
     free(tmp);
 
     printf("Number of output elements %lu\n", one);
-    comp_output(odata, gpu_odata, one);
+    int ret = comp_output(odata, gpu_odata, one);
 
     free(gpu_odata);
     free(odata);
 
-    printf("Test done.\n");
+    printf("Test done.\n\n");
+    return ret;
 }
 
-void test_lde_no_merkle_random() {
+int test_ntt_partial_hash_random() {
+    printf("Running NTT + Merkle Tree with partial hash test with random data...\n");
+
+    struct timeval start, end;
+
+    uint64_t ncols = 32;
+    uint64_t ine = 1 << 23;
+    uint64_t n = ine / ncols;
+    uint64_t n_tree_elem = 2 * n - 1;
+    uint64_t tree_size = n_tree_elem * 4;
+
+    Goldilocks::Element * idata = random_data(ine);
+    printf("Number of input elements %lu\n", ine);
+    Goldilocks::Element *tree1 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
+    assert(tree1 != NULL);
+    Goldilocks::Element *tmp = (Goldilocks::Element *)malloc(ine * sizeof(Goldilocks::Element));
+    assert(tmp != NULL);
+    Goldilocks::Element * tree2 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
+    assert(tree2 != NULL);
+
+    NTT_Goldilocks ntt(n);
+#ifdef __USE_CUDA__
+    ntt.setUseGPU(true);
+#endif
+    ntt.computeR(n);
+
+    gettimeofday(&start, NULL);
+    ntt.NTT(tmp, idata, n, ncols);
+    PoseidonGoldilocks::merkletree_avx(tree1, tmp, ncols, n);
+    gettimeofday(&end, NULL);
+    uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("NTT + Merkle Tree on CPU time: %lu ms\n", t / 1000);
+
+    gettimeofday(&start, NULL);
+    ntt.NTT_BatchGPU(tree2, idata, n, ncols, 8, tmp, 3, false, false, true);
+    gettimeofday(&end, NULL);
+    t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("NTT + Merkle Tree batch on GPU time: %lu ms\n", t / 1000);
+
+    free(idata);
+    free(tmp);
+
+    printf("Number of output elements %lu\n", tree_size);
+    int ret = comp_output(tree1, tree2, tree_size);
+
+    free(tree1);
+    free(tree2);
+
+    printf("Test done.\n\n");
+    return ret;
+}
+
+int test_lde_no_merkle_random() {
     printf("Running LDE only on random data...\n");
 
     struct timeval start, end;
@@ -263,15 +318,16 @@ void test_lde_no_merkle_random() {
     free(tmp);
 
     printf("Number of output elements %lu\n", one);
-    comp_output(odata1, odata2, one);
+    int ret = comp_output(odata1, odata2, one);
 
     free(odata1);
     free(odata2);
 
-    printf("Test done.\n");
+    printf("Test done.\n\n");
+    return ret;
 }
 
-void test_lde_merkle_random() {
+int test_lde_merkle_random() {
     printf("Running LDE + Merkle Tree on random data...\n");
 
     struct timeval start, end;
@@ -316,20 +372,23 @@ void test_lde_merkle_random() {
     free(tmp);
 
     printf("Number of output elements %lu\n", tree_size);
-    comp_output(tree1, tree2, tree_size);
+    int ret = comp_output(tree1, tree2, tree_size);
 
     free(tree1);
     free(tree2);
 
-    printf("Test done.\n");
+    printf("Test done.\n\n");
+    return ret;
 }
 
 int main(int argc, char **argv) {
-    // test((char*)"/data/workspace/dumi/x1-prover", 0);
+    // assert(1 == test((char*)"/data/workspace/dumi/x1-prover", 0));
 
-    test_random();
+    assert(1 == test_random());
 
-    test_lde_no_merkle_random();
+    assert(1 == test_lde_no_merkle_random());
 
-    test_lde_merkle_random();
+    assert(1 == test_lde_merkle_random());
+
+    assert(1 == test_ntt_partial_hash_random());
 }

@@ -184,7 +184,7 @@ public:
 #ifdef __USE_CUDA__
     void NTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool inverse = false, bool extend = false);
 
-    void NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, u_int64_t ncols_batch = 1, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool inverse = false, bool extend = false);
+    void NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, u_int64_t ncols_batch = 1, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool inverse = false, bool extend = false, bool buildMerkleTree = false);
 
     void INTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool extend = false);
 
