@@ -561,8 +561,8 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
 #pragma omp parallel for schedule(static)
     for (u_int64_t j = 0; j < N_Extended; j++) {
       for (u_int64_t i = 0; i < ncols; i++) {
-        //dst[j*ncols+i] = data[i*N_Extended+j];
-        dst[i*N_Extended+j] = data[j*ncols+i];
+        dst[j*ncols+i] = data[i*N_Extended+j];
+        //dst[i*N_Extended+j] = data[j*ncols+i];
       }
     }
     gettimeofday(&end, NULL);
