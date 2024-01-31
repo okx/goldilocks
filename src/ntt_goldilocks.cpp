@@ -549,12 +549,11 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
   gettimeofday(&start, NULL);
   NTT_cuda(data, data, N_Extended, ncols, NULL, false);
   gettimeofday(&end, NULL);
-  long seconds = end.tv_sec - start.tv_sec;
-  long microseconds = end.tv_usec - start.tv_usec;
-  long elapsed = seconds*1000 + microseconds/1000;
+  seconds = end.tv_sec - start.tv_sec;
+  microseconds = end.tv_usec - start.tv_usec;
+  elapsed = seconds*1000 + microseconds/1000;
   std::cout << "intt elapsed: " << elapsed << " ms\n";
 
-  Goldilocks::Element *dst_ = NULL;
   if (transpose && ncols > 1) {
     struct timeval start, end;
     gettimeofday(&start, NULL);
