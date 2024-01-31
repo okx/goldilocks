@@ -480,12 +480,12 @@ void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *sr
 
 void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, bool transpose)
 {
+  struct timeval start, end;
   if (dst == NULL) {
       dst = src;
   }
   Goldilocks::Element *data = NULL;
   if (transpose && ncols > 1) {
-    struct timeval start, end;
     gettimeofday(&start, NULL);
     if (buffer != NULL)
     {
@@ -507,12 +507,18 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
     long seconds = end.tv_sec - start.tv_sec;
     long microseconds = end.tv_usec - start.tv_usec;
     long elapsed = seconds*1000 + microseconds/1000;
-    std::cout << "transpose1 Elapsed time: " << elapsed << " ms\n";
+    std::cout << "transpose1 elapsed: " << elapsed << " ms\n";
   } else {
     data = src;
   }
 
+  gettimeofday(&start, NULL);
   INTT_cuda(data, data, N, ncols, NULL, false, true);
+  gettimeofday(&end, NULL);
+  long seconds = end.tv_sec - start.tv_sec;
+  long microseconds = end.tv_usec - start.tv_usec;
+  long elapsed = seconds*1000 + microseconds/1000;
+  std::cout << "intt elapsed: " << elapsed << " ms\n";
 
   //    printf("\nINTT outputs:\n");
   //    printf("[");
@@ -540,8 +546,13 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
   //    }
   //    printf("]\n");
 
+  gettimeofday(&start, NULL);
   NTT_cuda(data, data, N_Extended, ncols, NULL, false);
-
+  gettimeofday(&end, NULL);
+  long seconds = end.tv_sec - start.tv_sec;
+  long microseconds = end.tv_usec - start.tv_usec;
+  long elapsed = seconds*1000 + microseconds/1000;
+  std::cout << "intt elapsed: " << elapsed << " ms\n";
 
   Goldilocks::Element *dst_ = NULL;
   if (transpose && ncols > 1) {
@@ -559,7 +570,7 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
     long seconds = end.tv_sec - start.tv_sec;
     long microseconds = end.tv_usec - start.tv_usec;
     long elapsed = seconds*1000 + microseconds/1000;
-    std::cout << "transpose2 Elapsed time: " << elapsed << " ms\n";
+    std::cout << "transpose2 elapsed: " << elapsed << " ms\n";
 
     if (buffer == NULL) {
       free(data);

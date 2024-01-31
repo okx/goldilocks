@@ -2946,7 +2946,9 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
 {
 
   Goldilocks::Element *a = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+  Goldilocks::Element *a2 = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
   Goldilocks::Element *b = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+  Goldilocks::Element *b2 = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
   Goldilocks::Element *c = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
 
   NTT_Goldilocks ntt(FFT_SIZE);
@@ -2986,15 +2988,12 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
   //    }
   //    printf("]\n");
 
-  for (uint64_t i = 0; i < (FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS; i++)
-  {
-    b[i] = a[i];
-  }
+  Goldilocks::parcpy(b, a, (FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS);
 
   struct timeval start, end;
   gettimeofday(&start, NULL);
   printf("extendPol_cuda start...\n");
-  ntt.extendPol_cuda(a, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, c, true);
+  ntt.extendPol_cuda(a2, a, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, c, true);
   gettimeofday(&end, NULL);
   long seconds = end.tv_sec - start.tv_sec;
   long microseconds = end.tv_usec - start.tv_usec;
@@ -3002,7 +3001,7 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
   std::cout << "extendPol_cuda Elapsed time: " << elapsed << " ms\n";
 
   gettimeofday(&start, NULL);
-  ntt.extendPol(b, b, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, c);
+  ntt.extendPol(b2, b, FFT_SIZE << BLOWUP_FACTOR, FFT_SIZE, NUM_COLUMNS, c);
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
   microseconds = end.tv_usec - start.tv_usec;
@@ -3011,7 +3010,7 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
 
   for (uint64_t i = 0; i < (FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS; i++)
   {
-    ASSERT_EQ(a[i], b[i]);
+    ASSERT_EQ(a2[i], b2[i]);
   }
 
   //    printf("\noutputs:\n");
@@ -3024,6 +3023,9 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
 
   free(a);
   free(b);
+  free(a2);
+  free(b2);
+  free(c);
 }
 #endif // __USE_CUDA__
 TEST(GOLDILOCKS_CUBIC_TEST, one)
