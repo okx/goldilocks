@@ -13,7 +13,7 @@
 #define FFT_SIZE (uint64_t(1 << LOG_FFT_SIZE))
 #define NUM_REPS 5
 #define BLOWUP_FACTOR 1
-#define NUM_COLUMNS 64
+#define NUM_COLUMNS 665
 #define NPHASES 4
 #define NCOLS_HASH 128
 #define NROWS_HASH (1 << 6)
@@ -2953,15 +2953,16 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
 
   NTT_Goldilocks ntt(FFT_SIZE);
   ntt.computeR(FFT_SIZE);
+//  printf("calculate twiddle factors:\n");
+//  ntt.init_twiddle_factors_cuda(DEFAULT_GPU, LOG_FFT_SIZE);
+//  printf("calculate twiddle factors2\n");
+//  ntt.init_twiddle_factors_cuda(DEFAULT_GPU, LOG_FFT_SIZE+BLOWUP_FACTOR);
   printf("calculate twiddle factors:\n");
-  ntt.init_twiddle_factors_cuda(DEFAULT_GPU, LOG_FFT_SIZE);
-  printf("calculate twiddle factors2\n");
-  ntt.init_twiddle_factors_cuda(DEFAULT_GPU, LOG_FFT_SIZE+BLOWUP_FACTOR);
-//  #pragma omp parallel for schedule(static)
-//  for (u_int32_t i = 0; i < TOTAL_GPU; i++) {
-//      ntt.init_twiddle_factors_cuda(i, LOG_FFT_SIZE);
-//      ntt.init_twiddle_factors_cuda(i, LOG_FFT_SIZE+BLOWUP_FACTOR);
-//  }
+  #pragma omp parallel for schedule(static)
+  for (u_int32_t i = 0; i < TOTAL_GPU; i++) {
+      ntt.init_twiddle_factors_cuda(i, LOG_FFT_SIZE);
+      ntt.init_twiddle_factors_cuda(i, LOG_FFT_SIZE+BLOWUP_FACTOR);
+  }
 
 
   for (uint i = 0; i < 2; i++)
