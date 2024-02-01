@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <assert.h>
+#include <math.h>
 
 // Read binary file with the following format
 // - the first 6 elements (each of 8 bytes) are: nrows (or size), ncols, nphase, nblock, inverse, extend
@@ -330,9 +331,9 @@ int test_lde_merkle_random() {
 
     struct timeval start, end;
 
-    uint64_t ncols = 32;
-    uint64_t ine = 1 << 23;
-    uint64_t one = 1 << 24; // blowup factor 2
+    uint64_t ncols = 665;
+    uint64_t ine = ncols * (1 << 18);
+    uint64_t one = 2 * ine; // blowup factor 2
     uint64_t n = ine / ncols;
     uint64_t n_ext = one / ncols;
     uint64_t n_tree_elem = 2 * n_ext - 1;
@@ -393,8 +394,8 @@ int test_lde_merkle_batch_random() {
     uint64_t tree_size = n_tree_elem * 4;
 
     Goldilocks::Element * idata = random_data(ine);
-    printf("Number of input elements %lu\n", ine);
-    printf("Tree size %lu\n", tree_size);
+    printf("Rows %lu and columns %lu\n", n, ncols);
+    printf("Tree size %lu (log2 is %lu)\n", tree_size, (uint64_t)log2(tree_size));
     Goldilocks::Element *tree1 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
     assert(tree1 != NULL);
     Goldilocks::Element *tmp = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
@@ -415,14 +416,14 @@ int test_lde_merkle_batch_random() {
     PoseidonGoldilocks::merkletree_avx(tree1, tmp, ncols, n_ext);
     gettimeofday(&end, NULL);
     uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
-    printf("Extend on CPU time: %lu ms\n", t / 1000);
+    printf("LDE + Merkle Tree on CPU time: %lu ms\n", t / 1000);
 
     gettimeofday(&start, NULL);
     // ntt.LDE_BatchGPU(tmp2, idata, n, n_ext, ncols, 8, false);
     ntt.LDE_BatchGPU(tree2, idata, n, n_ext, ncols, 320);
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
-    printf("Extend on GPU time: %lu ms\n", t / 1000);
+    printf("LDE + Merkle Tree on GPU time: %lu ms\n", t / 1000);
 
     printf("Number of output elements %lu\n", tree_size);
     int ret = comp_output(tree1, tree2, tree_size);
@@ -445,9 +446,9 @@ int main(int argc, char **argv) {
 
     // assert(1 == test_lde_no_merkle_random());
 
-    // assert(1 == test_lde_merkle_random());
+    assert(1 == test_lde_merkle_random());
 
     // assert(1 == test_ntt_partial_hash_random());
 
-    test_lde_merkle_batch_random();
+    assert(1 == test_lde_merkle_batch_random());
 }

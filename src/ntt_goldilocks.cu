@@ -1070,6 +1070,7 @@ void NTT_Goldilocks::LDE_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     }
     uint64_t aux_size = ext_size * ncols_batch;
 
+    printf("\n*** in LDE_BatchGPU() ...\n");
     printf("Number of columns: %lu\n", ncols);
     printf("Number of batches: %lu\n", nbatches);
     printf("Cols per batch: %lu\n", ncols_batch);
@@ -1079,11 +1080,6 @@ void NTT_Goldilocks::LDE_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     Goldilocks::Element *dst_;
     aux = (Goldilocks::Element *)malloc(sizeof(Goldilocks::Element) * aux_size);
     dst_ = (Goldilocks::Element *)malloc(sizeof(Goldilocks::Element) * aux_size);
-
-#ifdef GPU_TIMING
-    // global start
-    gettimeofday(&start, NULL);
-#endif
 
     int gpu_id = 0;
     CHECKCUDAERR(cudaSetDevice(gpu_id));
@@ -1102,11 +1098,19 @@ void NTT_Goldilocks::LDE_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     CHECKCUDAERR(cudaMemcpyAsync(gpu_roots[gpu_id], (uint64_t *)roots, nRoots * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
     CHECKCUDAERR(cudaMemcpyAsync(gpu_powTwoInv[gpu_id], (uint64_t *)powTwoInv, (s + 1) * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
 
+#ifdef GPU_TIMING
+    // global start
+    gettimeofday(&start, NULL);
+#endif
     for (int b = 0; b < nbatches; b++)
     {
         printf("Batch %d\n", b);
         uint64_t aux_ncols = (b == nbatches - 1 && ncols_last_batch > 0) ? ncols_last_batch : ncols_batch;
 
+#ifdef GPU_TIMING
+    struct timeval start1;
+    gettimeofday(&start1, NULL);
+#endif
         if (buildMerkleTree)
         {
             // INTT
@@ -1130,19 +1134,32 @@ void NTT_Goldilocks::LDE_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
                 std::memcpy(&dst[offset2], &(dst_[ie * aux_ncols]), aux_ncols * sizeof(Goldilocks::Element));
             }
         }
+#ifdef GPU_TIMING
+        struct timeval end1;
+        gettimeofday(&end1, NULL);
+        uint64_t t = end1.tv_sec * 1000000 + end1.tv_usec - start1.tv_sec * 1000000 - start1.tv_usec;
+        printf("LDE_BatchGPU: batch took: %lu ms\n", t / 1000);
+#endif
     }
 
 #ifdef GPU_TIMING
     struct timeval end;
     gettimeofday(&end, NULL);
     uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
-    printf("NTT_BatchGPU: CPU memcpy took: %lu ms\n", t / 1000);
+    printf("LDE_BatchGPU: all batches took: %lu ms\n", t / 1000);
+    gettimeofday(&start, NULL);
 #endif
 
     if (buildMerkleTree)
     {
         PoseidonGoldilocks::merkletree_cuda_from_partial(dst, (uint64_t*)gpu_poseidon_state, ncols, ext_size);
     }
+
+#ifdef GPU_TIMING
+    gettimeofday(&end, NULL);
+    t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("LDE_BatchGPU: Merkle Tree building took: %lu ms\n", t / 1000);
+#endif
 
     CHECKCUDAERR(cudaSetDevice(gpu_id));
     CHECKCUDAERR(cudaStreamDestroy(gpu_stream[gpu_id]));
