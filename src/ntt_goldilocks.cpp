@@ -385,6 +385,14 @@ void NTT_Goldilocks::NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src
     data = src;
   }
 
+//  uint64_t batch_size = ncols / TOTAL_GPU;
+//  uint64_t last_batch_size = ncols - batch_size * (TOTAL_GPU-1);
+//#pragma omp parallel for schedule(static)
+//  for (u_int32_t i = 0; i < TOTAL_GPU; i++) {
+//    u_int64_t par_ncols = i < (TOTAL_GPU-1)? batch_size: last_batch_size;
+//    compute_batched_ntt(i, (fr_t *)(uint64_t *)(data+batch_size*i), log2(size), par_ncols, Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
+//  }
+
   compute_batched_ntt(DEFAULT_GPU, (fr_t *)(uint64_t *)data, log2(size), ncols, Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
   Goldilocks::Element *dst_ = NULL;
   if (transpose && ncols > 1) {
@@ -432,13 +440,13 @@ void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *sr
     data = src;
   }
 
-  //    uint64_t batch_size = ncols / 8;
-  //    uint64_t last_batch_size = ncols - batch_size * 7;
-  //#pragma omp parallel for schedule(static)
-  //    for (u_int32_t i = 0; i < 8; i++) {
-  //        u_int64_t par_ncols = i < 7? batch_size: last_batch_size;
-  //        compute_batched_ntt(i, (fr_t *)(uint64_t *)(src+batch_size*i), log2(size), par_ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
-  //    }
+//  uint64_t batch_size = ncols / TOTAL_GPU;
+//  uint64_t last_batch_size = ncols - batch_size * (TOTAL_GPU-1);
+//#pragma omp parallel for schedule(static)
+//  for (u_int32_t i = 0; i < TOTAL_GPU; i++) {
+//    u_int64_t par_ncols = i < (TOTAL_GPU-1)? batch_size: last_batch_size;
+//    compute_batched_ntt(i, (fr_t *)(uint64_t *)(data+batch_size*i), log2(size), par_ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
+//  }
 
   compute_batched_ntt(DEFAULT_GPU, (fr_t *)(uint64_t *)data, log2(size), ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
 
@@ -569,7 +577,7 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
   seconds = end.tv_sec - start.tv_sec;
   microseconds = end.tv_usec - start.tv_usec;
   elapsed = seconds*1000 + microseconds/1000;
-  std::cout << "intt elapsed: " << elapsed << " ms\n";
+  std::cout << "ntt elapsed: " << elapsed << " ms\n";
 
   if (transpose && ncols > 1) {
     struct timeval start, end;

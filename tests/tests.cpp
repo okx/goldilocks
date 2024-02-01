@@ -2958,7 +2958,7 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
   printf("calculate twiddle factors2\n");
   ntt.init_twiddle_factors_cuda(DEFAULT_GPU, LOG_FFT_SIZE+BLOWUP_FACTOR);
 //  #pragma omp parallel for schedule(static)
-//  for (u_int32_t i = 0; i < 8; i++) {
+//  for (u_int32_t i = 0; i < TOTAL_GPU; i++) {
 //      ntt.init_twiddle_factors_cuda(i, LOG_FFT_SIZE);
 //      ntt.init_twiddle_factors_cuda(i, LOG_FFT_SIZE+BLOWUP_FACTOR);
 //  }
