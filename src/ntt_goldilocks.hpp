@@ -198,6 +198,8 @@ public:
 
     void LDE_MerkleTree_CPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer = NULL, bool buildMerkleTree = true, u_int64_t nphase = NUM_PHASES);
 
+    void LDE_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, u_int64_t ncols_batch, bool buildMerkleTree = true);
+
     void setUseGPU(bool b) {
         this->use_gpu = b;
     }

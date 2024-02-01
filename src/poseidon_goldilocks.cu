@@ -211,10 +211,6 @@ __device__ void linear_partial_hash_one(gl64_t *input, uint32_t size, gl64_t *st
 {
     u32 remaining = size;
 
-    if (size <= CAPACITY)
-    {
-        return; // no need to hash
-    }
     while (remaining)
     {
         std::memcpy(state + RATE, state, CAPACITY * sizeof(gl64_t));

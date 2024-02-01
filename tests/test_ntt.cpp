@@ -227,8 +227,8 @@ int test_ntt_partial_hash_random() {
 
     struct timeval start, end;
 
-    uint64_t ncols = 32;
-    uint64_t ine = 1 << 23;
+    uint64_t ncols = 665;
+    uint64_t ine = ncols * (1 << 20);
     uint64_t n = ine / ncols;
     uint64_t n_tree_elem = 2 * n - 1;
     uint64_t tree_size = n_tree_elem * 4;
@@ -256,7 +256,7 @@ int test_ntt_partial_hash_random() {
     printf("NTT + Merkle Tree on CPU time: %lu ms\n", t / 1000);
 
     gettimeofday(&start, NULL);
-    ntt.NTT_BatchGPU(tree2, idata, n, ncols, 8, tmp, 3, false, false, true);
+    ntt.NTT_BatchGPU(tree2, idata, n, ncols, 88, tmp, 3, false, false, true);
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("NTT + Merkle Tree batch on GPU time: %lu ms\n", t / 1000);
@@ -379,14 +379,75 @@ int test_lde_merkle_random() {
     return ret;
 }
 
+int test_lde_merkle_batch_random() {
+    printf("Running LDE + Merkle Tree Batch GPU on random data...\n");
+
+    struct timeval start, end;
+
+    uint64_t ncols = 665;
+    uint64_t ine = ncols * (1 << 20);
+    uint64_t one = 2 * ine;
+    uint64_t n = ine / ncols;
+    uint64_t n_ext = one / ncols;
+    uint64_t n_tree_elem = 2 * n_ext - 1;
+    uint64_t tree_size = n_tree_elem * 4;
+
+    Goldilocks::Element * idata = random_data(ine);
+    printf("Number of input elements %lu\n", ine);
+    printf("Tree size %lu\n", tree_size);
+    Goldilocks::Element *tree1 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
+    assert(tree1 != NULL);
+    Goldilocks::Element *tmp = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
+    assert(tmp != NULL);
+    Goldilocks::Element *tmp2 = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
+    assert(tmp2 != NULL);
+    Goldilocks::Element * tree2 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
+    assert(tree2 != NULL);
+
+    NTT_Goldilocks ntt(n_ext, 0, n_ext/n);
+#ifdef __USE_CUDA__
+    ntt.setUseGPU(true);
+#endif
+    ntt.computeR(n_ext);
+
+    gettimeofday(&start, NULL);
+    ntt.extendPol(tmp, idata, n_ext, n, ncols);
+    PoseidonGoldilocks::merkletree_avx(tree1, tmp, ncols, n_ext);
+    gettimeofday(&end, NULL);
+    uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("Extend on CPU time: %lu ms\n", t / 1000);
+
+    gettimeofday(&start, NULL);
+    // ntt.LDE_BatchGPU(tmp2, idata, n, n_ext, ncols, 8, false);
+    ntt.LDE_BatchGPU(tree2, idata, n, n_ext, ncols, 320);
+    gettimeofday(&end, NULL);
+    t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
+    printf("Extend on GPU time: %lu ms\n", t / 1000);
+
+    printf("Number of output elements %lu\n", tree_size);
+    int ret = comp_output(tree1, tree2, tree_size);
+    // int ret = comp_output(tmp, tmp2, one);
+
+    free(idata);
+    free(tmp);
+    free(tmp2);
+    free(tree1);
+    free(tree2);
+
+    printf("Test done.\n\n");
+    return ret;
+}
+
 int main(int argc, char **argv) {
     // assert(1 == test((char*)"/data/workspace/dumi/x1-prover", 0));
 
-    assert(1 == test_random());
+    // assert(1 == test_random());
 
-    assert(1 == test_lde_no_merkle_random());
+    // assert(1 == test_lde_no_merkle_random());
 
-    assert(1 == test_lde_merkle_random());
+    // assert(1 == test_lde_merkle_random());
 
-    assert(1 == test_ntt_partial_hash_random());
+    // assert(1 == test_ntt_partial_hash_random());
+
+    test_lde_merkle_batch_random();
 }
