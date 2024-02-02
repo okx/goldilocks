@@ -507,10 +507,18 @@ void PoseidonGoldilocks::merkletree_cuda(Goldilocks::Element *tree, Goldilocks::
     CHECKCUDAERR(cudaFree(gpu_tree));
 }
 
- void PoseidonGoldilocks::partial_hash_init_gpu(uint64_t *state, uint32_t num_rows)
+ void PoseidonGoldilocks::partial_hash_init_gpu(uint64_t **state, uint32_t num_rows, uint32_t ngpus)
  {
     init_gpu_const();
-    linear_partial_init_hash_gpu<<<num_rows/TPB + 1, TPB>>>(state, num_rows);
+    int nDevices;
+    CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
+    nDevices = (ngpus < nDevices) ? ngpus : nDevices;
+    for (int i = 0; i < nDevices; i++)
+    {
+        CHECKCUDAERR(cudaSetDevice(i));
+        linear_partial_init_hash_gpu<<<num_rows/TPB + 1, TPB>>>(state[i], num_rows);
+    }
+    CHECKCUDAERR(cudaSetDevice(0));
  }
 
 void PoseidonGoldilocks::merkletree_cuda_gpudata(Goldilocks::Element *tree, uint64_t *gpu_input, uint64_t num_cols, uint64_t num_rows, int nThreads, uint64_t dim)
@@ -565,7 +573,7 @@ void PoseidonGoldilocks::partial_hash_gpu(uint64_t *input, uint32_t num_cols, ui
     linear_partial_hash_gpu<<<num_rows/TPB + 1, TPB>>>(input, num_cols, num_rows, state);
 }
 
-void PoseidonGoldilocks::merkletree_cuda_from_partial(Goldilocks::Element *tree, uint64_t *gpu_input, uint64_t num_cols, uint64_t num_rows, int nThreads, uint64_t dim)
+void PoseidonGoldilocks::merkletree_cuda_from_partial(Goldilocks::Element *tree, uint64_t *gpu_input, uint64_t num_cols, uint64_t num_rows, uint32_t gpu_id, int nThreads, uint64_t dim)
 {
     if (num_rows == 0)
     {
@@ -577,7 +585,7 @@ void PoseidonGoldilocks::merkletree_cuda_from_partial(Goldilocks::Element *tree,
     u32 actual_tpb = TPB;
     u32 actual_blks = num_rows / TPB + 1;
 
-    CHECKCUDAERR(cudaSetDevice(0));
+    CHECKCUDAERR(cudaSetDevice(gpu_id));
     CHECKCUDAERR(cudaMalloc(&gpu_tree, numElementsTree * sizeof(uint64_t)));
     if (num_rows < TPB)
     {

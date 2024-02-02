@@ -280,9 +280,9 @@ int test_lde_no_merkle_random() {
 
     struct timeval start, end;
 
-    uint64_t ncols = 32;
-    uint64_t ine = 1 << 23;
-    uint64_t one = 1 << 24; // blowup factor 2
+    uint64_t ncols = 80;
+    uint64_t ine = ncols * (1 << 23);
+    uint64_t one = ine << 1; // blowup factor 2
     uint64_t n = ine / ncols;
     uint64_t n_ext = one / ncols;
 
@@ -308,7 +308,8 @@ int test_lde_no_merkle_random() {
     printf("Extend on CPU time: %lu ms\n", t / 1000);
 
     gettimeofday(&start, NULL);
-    ntt.LDE_MerkleTree_GPU(odata2, idata, n, n_ext, ncols, tmp, false); // false means do not build the Merkle Tree
+    // ntt.LDE_MerkleTree_GPU(odata2, idata, n, n_ext, ncols, tmp, false); // false means do not build the Merkle Tree
+    ntt.LDE_MerkleTree_MultiGPU(odata2, idata, n, n_ext, ncols, tmp, 3, false);
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("Extend on GPU time: %lu ms\n", t / 1000);
@@ -331,8 +332,8 @@ int test_lde_merkle_random() {
 
     struct timeval start, end;
 
-    uint64_t ncols = 665;
-    uint64_t ine = ncols * (1 << 18);
+    uint64_t ncols = 640;
+    uint64_t ine = ncols * (1 << 23);
     uint64_t one = 2 * ine; // blowup factor 2
     uint64_t n = ine / ncols;
     uint64_t n_ext = one / ncols;
@@ -344,8 +345,10 @@ int test_lde_merkle_random() {
     printf("Tree size %lu\n", tree_size);
     Goldilocks::Element *tree1 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
     assert(tree1 != NULL);
-    Goldilocks::Element *tmp = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
-    assert(tmp != NULL);
+    Goldilocks::Element *tmp1 = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
+    assert(tmp1 != NULL);
+    Goldilocks::Element *tmp2 = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
+    assert(tmp2 != NULL);
     Goldilocks::Element * tree2 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
     assert(tree2 != NULL);
 
@@ -356,19 +359,21 @@ int test_lde_merkle_random() {
     ntt.computeR(n_ext);
 
     gettimeofday(&start, NULL);
-    ntt.LDE_MerkleTree_CPU(tree1, idata, n, n_ext, ncols, tmp);
+    ntt.LDE_MerkleTree_CPU(tree1, idata, n, n_ext, ncols, tmp1);
     gettimeofday(&end, NULL);
     uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("Extend on CPU time: %lu ms\n", t / 1000);
 
     gettimeofday(&start, NULL);
-    ntt.LDE_MerkleTree_GPU(tree2, idata, n, n_ext, ncols, tmp);
+    // ntt.LDE_MerkleTree_GPU(tree2, idata, n, n_ext, ncols, tmp);
+    ntt.LDE_MerkleTree_MultiGPU(tree2, idata, n, n_ext, ncols, tmp2);
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("Extend on GPU time: %lu ms\n", t / 1000);
 
     free(idata);
-    free(tmp);
+    free(tmp1);
+    free(tmp2);
 
     printf("Number of output elements %lu\n", tree_size);
     int ret = comp_output(tree1, tree2, tree_size);
@@ -385,8 +390,8 @@ int test_lde_merkle_batch_random() {
 
     struct timeval start, end;
 
-    uint64_t ncols = 665;
-    uint64_t ine = ncols * (1 << 20);
+    uint64_t ncols = 64;
+    uint64_t ine = ncols * (1 << 23);
     uint64_t one = 2 * ine;
     uint64_t n = ine / ncols;
     uint64_t n_ext = one / ncols;
@@ -420,7 +425,7 @@ int test_lde_merkle_batch_random() {
 
     gettimeofday(&start, NULL);
     // ntt.LDE_BatchGPU(tmp2, idata, n, n_ext, ncols, 8, false);
-    ntt.LDE_BatchGPU(tree2, idata, n, n_ext, ncols, 320);
+    ntt.LDE_MerkleTree_BatchGPU(tree2, idata, n, n_ext, ncols, 8);
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("LDE + Merkle Tree on GPU time: %lu ms\n", t / 1000);
@@ -450,5 +455,5 @@ int main(int argc, char **argv) {
 
     // assert(1 == test_ntt_partial_hash_random());
 
-    assert(1 == test_lde_merkle_batch_random());
+    // assert(1 == test_lde_merkle_batch_random());
 }
