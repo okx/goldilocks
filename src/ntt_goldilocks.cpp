@@ -386,14 +386,15 @@ void NTT_Goldilocks::NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src
   }
 
   uint64_t batch_size = ncols / TOTAL_GPU;
-  uint64_t last_batch_size = ncols - batch_size * (TOTAL_GPU-1);
+  uint64_t last_batch_size = batch_size + ncols % TOTAL_GPU;
 #pragma omp parallel for schedule(static)
   for (u_int32_t i = 0; i < TOTAL_GPU; i++) {
-    u_int64_t par_ncols = i < (TOTAL_GPU-1)? batch_size: last_batch_size;
-    compute_batched_ntt(i, (fr_t *)(uint64_t *)(data+size*batch_size*i), log2(size), par_ncols, Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
+    u_int64_t par_ncols = i == (TOTAL_GPU-1)? last_batch_size: batch_size;
+    if (par_ncols > 0) {
+        compute_batched_ntt(i, (fr_t *)(uint64_t *)(data+size*batch_size*i), log2(size), par_ncols, Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
+    }
   }
 
-  //compute_batched_ntt(DEFAULT_GPU, (fr_t *)(uint64_t *)data, log2(size), ncols, Ntt_Types::NN, Ntt_Types::Direction::forward, Ntt_Types::Type::standard);
   Goldilocks::Element *dst_ = NULL;
   if (transpose && ncols > 1) {
     if (dst != NULL && dst != src)
@@ -418,6 +419,7 @@ void NTT_Goldilocks::NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src
 
 void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, Goldilocks::Element *buffer, bool transpose, bool extend)
 {
+  struct timeval start, end;
   Goldilocks::Element *data = NULL;
   if (transpose && ncols > 1) {
     if (buffer != NULL)
@@ -440,23 +442,35 @@ void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *sr
     data = src;
   }
 
+  gettimeofday(&start, NULL);
   uint64_t batch_size = ncols / TOTAL_GPU;
-  uint64_t last_batch_size = ncols - batch_size * (TOTAL_GPU-1);
+  uint64_t last_batch_size = batch_size + ncols % TOTAL_GPU;
 #pragma omp parallel for schedule(static)
   for (u_int32_t i = 0; i < TOTAL_GPU; i++) {
-    u_int64_t par_ncols = i < (TOTAL_GPU-1)? batch_size: last_batch_size;
-    compute_batched_ntt(i, (fr_t *)(uint64_t *)(data+size*batch_size*i), log2(size), par_ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
+    u_int64_t par_ncols = i == (TOTAL_GPU-1)? last_batch_size: batch_size;
+    if (par_ncols > 0) {
+      compute_batched_ntt(i, (fr_t *)(uint64_t *)(data+size*batch_size*i), log2(size), par_ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
+    }
   }
-
-  //compute_batched_ntt(DEFAULT_GPU, (fr_t *)(uint64_t *)data, log2(size), ncols, Ntt_Types::NN, Ntt_Types::Direction::inverse, Ntt_Types::Type::standard);
+  gettimeofday(&end, NULL);
+  long seconds = end.tv_sec - start.tv_sec;
+  long microseconds = end.tv_usec - start.tv_usec;
+  long elapsed = seconds*1000 + microseconds/1000;
+  std::cout << "intt elapsed: " << elapsed << " ms\n";
 
   if (extend) {
+    gettimeofday(&start, NULL);
 #pragma omp parallel for schedule(static)
     for (u_int64_t j = 0; j < size; j++) {
       for (u_int64_t i = 0; i < ncols; i++) {
         data[i*size+j] = data[i*size+j] * r[j];
       }
     }
+    gettimeofday(&end, NULL);
+    long seconds = end.tv_sec - start.tv_sec;
+    long microseconds = end.tv_usec - start.tv_usec;
+    long elapsed = seconds*1000 + microseconds/1000;
+    std::cout << "intt extend elapsed: " << elapsed << " ms\n";
   }
 
   Goldilocks::Element *dst_ = NULL;
@@ -520,13 +534,7 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
     data = src;
   }
 
-  gettimeofday(&start, NULL);
   INTT_cuda(data, data, N, ncols, NULL, false, true);
-  gettimeofday(&end, NULL);
-  long seconds = end.tv_sec - start.tv_sec;
-  long microseconds = end.tv_usec - start.tv_usec;
-  long elapsed = seconds*1000 + microseconds/1000;
-  std::cout << "intt elapsed: " << elapsed << " ms\n";
 
   //    printf("\nINTT outputs:\n");
   //    printf("[");
@@ -537,19 +545,21 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
   //    printf("]\n");
 
   gettimeofday(&start, NULL);
-  // NEVER do it in parallel!
-  for (u_int64_t j = ncols; j > 0; j/=2) {
-#pragma omp parallel for schedule(static)
-    for (u_int64_t i = j-1; i >= j/2; i--) {
+//  // can not be done in parallel, but the second half can be done in parallel
+//  for (u_int64_t j = ncols-1; j > 0; j--) {
+//    std::memcpy(&data[j * N_Extended], &data[j * N], N * sizeof(Goldilocks::Element));
+//  }
+
+  for (u_int64_t j = ncols; j > 1; j=(j+1)/2) {
+#pragma omp parallel for
+    for (u_int64_t i = j-1; i > (j-1)/2; i--) {
       std::memcpy(&data[i * N_Extended], &data[i * N], N * sizeof(Goldilocks::Element));
     }
   }
-
-
   gettimeofday(&end, NULL);
-  seconds = end.tv_sec - start.tv_sec;
-  microseconds = end.tv_usec - start.tv_usec;
-  elapsed = seconds*1000 + microseconds/1000;
+  long seconds = end.tv_sec - start.tv_sec;
+  long microseconds = end.tv_usec - start.tv_usec;
+  long elapsed = seconds*1000 + microseconds/1000;
   std::cout << "memcpy1 elapsed: " << elapsed << " ms\n";
 
   gettimeofday(&start, NULL);
