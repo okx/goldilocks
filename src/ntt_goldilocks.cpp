@@ -502,7 +502,7 @@ void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *sr
 
 void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, bool transpose)
 {
-  printf("extendPol_cuda, src=%p, dst=%p, N_Extended=%ld, N=%ld, ncols=%ld; buffer=%p, transpose=%d\n", dst, src, log2(N_Extended), log2(N), ncols, buffer, transpose);
+  printf("extendPol_cuda, src=%p, dst=%p, log_N_Extended=%d, log_N=%d, ncols=%ld; buffer=%p, transpose=%d, nThreads=%d\n", dst, src, log2(N_Extended), log2(N), ncols, buffer, transpose, nThreads);
   struct timeval start, end;
   if (dst == NULL) {
       dst = src;
@@ -615,8 +615,14 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
   }
 }
 
+// 8 gpu, log_domain_size = 30
+static bool twiddle_factor_flags[240];
+
 void NTT_Goldilocks::init_twiddle_factors_cuda(u_int64_t device_id, u_int64_t lg_n)
 {
-  init_twiddle_factors(device_id, lg_n);
+  if (!twiddle_factor_flags[device_id*30 + lg_n]) {
+    twiddle_factor_flags[device_id*30 + lg_n] = true;
+    init_twiddle_factors(device_id, lg_n);
+  }
 }
 #endif // __USE_CUDA__
