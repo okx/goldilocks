@@ -1,8 +1,8 @@
 #include "ntt_goldilocks.hpp"
 #include <sys/time.h>
 #ifdef __USE_CUDA__
-#include <cryptography_cuda/src/lib.h>
-#include <cryptography_cuda/cuda/ntt/ntt.h>
+#include <src/lib.h>
+#include <cuda/ntt/ntt.h>
 #endif // __USE_CUDA__
 
 static inline u_int64_t BR(u_int64_t x, u_int64_t domainPow)
