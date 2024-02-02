@@ -502,6 +502,8 @@ void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *sr
 
 void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, bool transpose)
 {
+  printf("extendPol_cuda, src=%p, dst=%p, N_Extended=%ld, N=%ld, ncols=%ld; buffer=%p, transpose=%s\n",
+         dst, src, N_Extended, N, ncols, buffer, transpose);
   struct timeval start, end;
   if (dst == NULL) {
       dst = src;
