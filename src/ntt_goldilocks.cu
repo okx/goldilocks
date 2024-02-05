@@ -4,7 +4,7 @@
 #include <cuda_runtime.h>
 
 __device__ __constant__ uint64_t omegas[33] = {
-    1
+    1,
     18446744069414584320ULL,
     281474976710656ULL,
     16777216ULL,
@@ -127,7 +127,7 @@ __global__ void reverse_permutation(gl64_t *data, uint32_t log_domain_size, uint
 
 __global__ void init_twiddle_factors(uint32_t log_domain_size) {
   printf("into init_twiddle_factors\n");
-  tif (FORWARD_TWIDDLE_FACTORS[log_domain_size] == NULL) {
+  if (FORWARD_TWIDDLE_FACTORS[log_domain_size] == NULL) {
     cudaMalloc((void**)&FORWARD_TWIDDLE_FACTORS[log_domain_size], (1<<log_domain_size)*sizeof(gl64_t));
     FORWARD_TWIDDLE_FACTORS[log_domain_size][0] = gl64_t::one();
     for (uint32_t i = 1; i<(1<<log_domain_size); i++) {
