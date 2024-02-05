@@ -127,20 +127,9 @@ __global__ void reverse_permutation(gl64_t *data, uint32_t log_domain_size, uint
 
 __global__ void init_twiddle_factors(uint32_t log_domain_size) {
   printf("into init_twiddle_factors\n");
-  if (FORWARD_TWIDDLE_FACTORS[log_domain_size] == NULL) {
-    printf("123\n");
-    CHECKCUDAERR(cudaMalloc((void**)&FORWARD_TWIDDLE_FACTORS[log_domain_size], (1<<log_domain_size)*sizeof(gl64_t)));
-    FORWARD_TWIDDLE_FACTORS[log_domain_size][0] = gl64_t::one();
-    for (uint32_t i = 1; i<(1<<log_domain_size); i++) {
-      FORWARD_TWIDDLE_FACTORS[log_domain_size][i] = FORWARD_TWIDDLE_FACTORS[log_domain_size][i-1] * gl64_t(omegas[log_domain_size]);
-    }
-  }
-  if (INVERSE_TWIDDLE_FACTORS[log_domain_size] == NULL) {
-    cudaMalloc((void**)&INVERSE_TWIDDLE_FACTORS[log_domain_size], (1<<log_domain_size)*sizeof(gl64_t));
-    INVERSE_TWIDDLE_FACTORS[log_domain_size][0] = gl64_t::one();
-    for (uint32_t i = 1; i<(1<<log_domain_size); i++) {
-      INVERSE_TWIDDLE_FACTORS[log_domain_size][i] = INVERSE_TWIDDLE_FACTORS[log_domain_size][i-1] * gl64_t(omegas_inv[log_domain_size]);
-    }
+  FORWARD_TWIDDLE_FACTORS[log_domain_size][0] = gl64_t::one();
+  for (uint32_t i = 1; i<(1<<log_domain_size); i++) {
+    FORWARD_TWIDDLE_FACTORS[log_domain_size][i] = FORWARD_TWIDDLE_FACTORS[log_domain_size][i-1] * gl64_t(omegas[log_domain_size]);
   }
 
   printf("\ntf:\n");
@@ -154,14 +143,15 @@ __global__ void init_twiddle_factors(uint32_t log_domain_size) {
 }
 
 void NTT_cuda(gl64_t *dst, gl64_t *src, uint32_t log_domain_size, uint32_t ncols) {
+
   uint32_t domain_size = 1<<log_domain_size;
-  //gl64_t *device_src;
+  CHECKCUDAERR(cudaMalloc((void**)&FORWARD_TWIDDLE_FACTORS[log_domain_size], (1<<log_domain_size)*sizeof(gl64_t)));
+
   gl64_t *device_dst;
-  //cudaMalloc((void**)&device_src, domain_size * ncols * sizeof(gl64_t));
   CHECKCUDAERR(cudaMalloc((void**)&device_dst, domain_size * ncols * sizeof(gl64_t)));
   cudaMemcpy(device_dst, src, domain_size * ncols * sizeof(gl64_t), cudaMemcpyHostToDevice);
-  reverse_permutation<<<1, domain_size>>>(device_dst, log_domain_size, ncols);
 
+  reverse_permutation<<<1, domain_size>>>(device_dst, log_domain_size, ncols);
 
   CHECKCUDAERR(cudaMemcpy(dst, device_dst, domain_size * ncols * sizeof(gl64_t), cudaMemcpyDeviceToHost));
   printf("\nrp:\n");
