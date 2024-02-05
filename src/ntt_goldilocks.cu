@@ -149,7 +149,7 @@ void NTT_cuda(gl64_t *dst, gl64_t *src, uint32_t log_domain_size, uint32_t ncols
 
   gl64_t *device_dst;
   CHECKCUDAERR(cudaMalloc((void**)&device_dst, domain_size * ncols * sizeof(gl64_t)));
-  cudaMemcpy(device_dst, src, domain_size * ncols * sizeof(gl64_t), cudaMemcpyHostToDevice);
+  CHECKCUDAERR(cudaMemcpy(device_dst, src, domain_size * ncols * sizeof(gl64_t), cudaMemcpyHostToDevice));
 
   reverse_permutation<<<1, domain_size>>>(device_dst, log_domain_size, ncols);
 
@@ -173,9 +173,10 @@ void NTT_cuda(gl64_t *dst, gl64_t *src, uint32_t log_domain_size, uint32_t ncols
 
 int main() {
   uint32_t log_domain_size = 4;
+  uint32_t domain_size = 1<<log_domain_size;
   uint32_t ncols = 1;
-  uint64_t *a = (uint64_t *)malloc((1<<log_domain_size) * sizeof(uint64_t));
-  uint64_t *b = (uint64_t *)malloc((1<<log_domain_size) * sizeof(uint64_t));
+  uint64_t *a = (uint64_t *)malloc(domain_size * ncols * sizeof(uint64_t));
+  uint64_t *b = (uint64_t *)malloc(domain_size * ncols * sizeof(uint64_t));
   for (uint64_t i = 0; i < 2; i++)
   {
     for (uint64_t j = 0; j < ncols; j++)
@@ -184,7 +185,7 @@ int main() {
     }
   }
 
-  for (uint64_t i = 2; i < (1<<log_domain_size); i++)
+  for (uint64_t i = 2; i < domain_size; i++)
   {
     for (uint64_t j = 0; j < ncols; j++)
     {
@@ -194,7 +195,7 @@ int main() {
 
   printf("\ninputs:\n");
   printf("[");
-  for (uint j = 0; j < (1<<log_domain_size) * ncols; j++)
+  for (uint j = 0; j < domain_size * ncols; j++)
   {
     printf("%lu, ", a[j]);
   }
@@ -206,7 +207,7 @@ int main() {
 
   printf("\noutputs:\n");
   printf("[");
-  for (uint j = 0; j < (1<<log_domain_size) * ncols; j++)
+  for (uint j = 0; j < domain_size * ncols; j++)
   {
     printf("%lu, ", b[j]);
   }
