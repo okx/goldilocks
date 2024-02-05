@@ -122,6 +122,10 @@ runbenchcpu: benchcpu
 runbenchgpu: benchgpu
 	./benchgpu --benchmark_filter=MERKLETREE_BENCH_CUDA
 
+runnew:
+	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) -o ntt src/ntt_goldilocks.cu
+	./ntt
+
 clean:
 	$(RM) -r $(BUILD_DIR)
 
