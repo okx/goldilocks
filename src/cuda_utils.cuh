@@ -17,4 +17,20 @@ __host__ inline void checkCudaError(cudaError_t code, const char *file, int line
         checkCudaError((ans), __FILE__, __LINE__); \
     }
 
+__device__ __forceinline__ void mymemcpy(uint64_t* dst, uint64_t* src, size_t n)
+{
+    for (uint32_t i = 0; i < n; i++)
+    {
+        dst[i] = src[i];
+    }
+}
+
+__device__ __forceinline__ void mymemset(uint64_t* dst, uint64_t v, size_t n)
+{
+    for (uint32_t i = 0; i < n; i++)
+    {
+        dst[i] = v;
+    }
+}
+
 #endif  // __CUDA_UTILS_H__

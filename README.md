@@ -37,6 +37,10 @@ Similarly for benchmarks: ``make benchcpu`` and ``make benchgpu``.
 
 The script [``configure.sh``](configure.sh) finds the CUDA capability of the GPU installed on the host system and updates the file [``CudaArch.mk``](CudaArch.mk) which is used by the Makefile.
 
+## Profiling and Timers
+
+Timers (similar to those in zkProver) can be enabled with the flag ``GPU_TIMING``.
+
 ## Original Readme - Example of Usage
 ```cpp
 #include <iostream>

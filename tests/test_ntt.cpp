@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <math.h>
+#include <errno.h>
 
 // Read binary file with the following format
 // - the first 6 elements (each of 8 bytes) are: nrows (or size), ncols, nphase, nblock, inverse, extend
@@ -71,6 +72,25 @@ Goldilocks::Element *read_file_v2(char *fname, size_t total_elem)
     return data;
 }
 
+void read_file_v3(char *fname, uint64_t* n_elem, uint64_t* params)
+{
+    FILE *f = fopen(fname, "rb");
+    assert(f != NULL);
+    assert(6 == fread(params, sizeof(uint64_t), 6, f));
+    *n_elem = params[0] * params[1];
+    fclose(f);
+}
+
+Goldilocks::Element *map_file(char *fname, size_t total_elem)
+{
+    int fd = open(fname, O_RDONLY);
+    assert(-1 != fd);
+    void *ret = mmap(NULL, total_elem * sizeof(Goldilocks::Element), PROT_READ, MAP_PRIVATE, fd, 0);
+    printf("Errno: %d\n", errno);
+    assert(-1 != (int64_t)ret);
+    return (Goldilocks::Element *)ret;
+}
+
 Goldilocks::Element *random_data(size_t total_elem)
 {
     Goldilocks::Element *data = (Goldilocks::Element *)malloc(total_elem * sizeof(Goldilocks::Element));
@@ -117,48 +137,69 @@ int test(char* path, int testId) {
     uint64_t iparams[6] = {0};
     // uint64_t oparams[6] = {0};
     uint64_t ine, one;
-    Goldilocks::Element * idata = read_file(ifilename, &ine, iparams);
+    // Goldilocks::Element * idata = read_file(ifilename, &ine, iparams);
+    read_file_v3(ifilename, &ine, iparams);
+    iparams[1] = 640;
+    ine = iparams[0] * iparams[1];
+    one = 2 * ine;
+    Goldilocks::Element * idata1 = map_file(ifilename, ine + 6);
+    Goldilocks::Element * idata = idata1 + 6;
     printf("Number of input elements %lu\n", ine);
-    uint64_t tree_size = (2 * iparams[0] - 1) * 4;
+    uint64_t tree_size = (4 * iparams[0] - 1) * 4;  // 4 * n -> n_ext
     printf("Number of tree elements %lu\n", tree_size);
     Goldilocks::Element *tree1 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
     assert(tree1 != NULL);
-    Goldilocks::Element *tmp = (Goldilocks::Element *)malloc(2 * ine * sizeof(Goldilocks::Element));
+    Goldilocks::Element *tmp = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
     assert(tmp != NULL);
+    Goldilocks::Element *tmp2 = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
+    assert(tmp2 != NULL);
     Goldilocks::Element * tree2 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
     assert(tree2 != NULL);
 
-    NTT_Goldilocks ntt(iparams[0]);
+    NTT_Goldilocks ntt(2 * iparams[0]);
 #ifdef __USE_CUDA__
     ntt.setUseGPU(true);
 #endif
-    ntt.computeR(iparams[0]);
+    ntt.computeR(2 * iparams[0]);
 
-    gettimeofday(&start, NULL);    
-    ntt.extendPol(tmp, idata, 2*iparams[0], iparams[0], iparams[1], NULL, iparams[2], iparams[3]);
-    PoseidonGoldilocks::merkletree_avx(tree1, tmp, iparams[1], 2*iparams[0]);
+    // warmup
+    ntt.NTT(tmp, idata, iparams[0], iparams[1]);
+    printf("Start LDE on CPU ...\n");
+    gettimeofday(&start, NULL);
+    // ntt.extendPol(tmp, idata, 2*iparams[0], iparams[0], iparams[1], NULL, iparams[2], iparams[3]);
+    // PoseidonGoldilocks::merkletree_avx(tree1, tmp, iparams[1], 2*iparams[0]);
+    ntt.LDE_MerkleTree_CPU(tree1, idata, iparams[0], 2 * iparams[0], iparams[1], tmp);
     gettimeofday(&end, NULL);
     uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("LDE + Merkle Tree on CPU time: %lu ms\n", t / 1000);
 
-    memset(tmp, 0, 2 * ine * sizeof(Goldilocks::Element));
+    // memset(tmp, 0, 2 * ine * sizeof(Goldilocks::Element));
     ntt.setUseGPU(true);
     gettimeofday(&start, NULL);
-    ntt.INTT(tmp, idata, iparams[0], iparams[1], NULL, 3, 1, true);
-    ntt.NTT_BatchGPU(tree2, tmp, 2*iparams[0], iparams[1], 80, NULL, 3, false, false, true);
+    // ntt.INTT(tmp, idata, iparams[0], iparams[1], NULL, 3, 1, true);
+    // ntt.NTT_BatchGPU(tree2, tmp, 2*iparams[0], iparams[1], 80, NULL, 3, false, false, true);
+    ntt.LDE_MerkleTree_MultiGPU_v2(tree2, idata, iparams[0], 2*iparams[0], iparams[1], tmp2);
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("LDE + Merkle Tree on GPU time: %lu ms\n", t / 1000);
 
-    free(idata);
-    free(tmp);
+    // free(idata);
+    munmap(idata1, (ine + 6) * sizeof(Goldilocks::Element));
 
+    int ret = comp_output(tmp, tmp2, one);
+
+    free(tmp);
+    free(tmp2);
+
+/*
     one = 2 * ine;
     Goldilocks::Element * orefdata = read_file_v2(ofilename, one);
     printf("Number of output elements %lu\n", one);
     int ret = comp_output(tree1, tree2, tree_size);
-
     free(orefdata);
+*/
+
+    ret = comp_output(tree1, tree2, tree_size);
     free(tree1);
     free(tree2);
 
@@ -445,13 +486,13 @@ int test_lde_merkle_batch_random() {
 }
 
 int main(int argc, char **argv) {
-    // assert(1 == test((char*)"/data/workspace/dumi/x1-prover", 0));
+    assert(1 == test((char*)"/data/workspace/dumi/x1-prover", 0));
 
     // assert(1 == test_random());
 
     // assert(1 == test_lde_no_merkle_random());
 
-    assert(1 == test_lde_merkle_random());
+    // assert(1 == test_lde_merkle_random());
 
     // assert(1 == test_ntt_partial_hash_random());
 

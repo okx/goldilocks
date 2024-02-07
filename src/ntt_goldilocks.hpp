@@ -200,12 +200,14 @@ public:
 
     void LDE_MerkleTree_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool buildMerkleTree = true);
 
+    void LDE_MerkleTree_MultiGPU_v2(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool buildMerkleTree = true);
+
     void setUseGPU(bool b) {
         this->use_gpu = b;
     }
 #endif  // __USE_CUDA__
 
-    void reversePermutation(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all);
+    void reversePermutation(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, uint32_t numThreads);
     inline Goldilocks::Element &root(u_int32_t domainPow, u_int64_t idx)
     {
         return roots[idx << (s - domainPow)];
