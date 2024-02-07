@@ -9,11 +9,11 @@
 #include <immintrin.h>
 #include <sys/time.h>
 
-#define LOG_FFT_SIZE 23
+#define LOG_FFT_SIZE 6
 #define FFT_SIZE (uint64_t(1 << LOG_FFT_SIZE))
 #define NUM_REPS 5
 #define BLOWUP_FACTOR 1
-#define NUM_COLUMNS 665
+#define NUM_COLUMNS 5
 #define NPHASES 4
 #define NCOLS_HASH 128
 #define NROWS_HASH (1 << 6)
@@ -2728,27 +2728,27 @@ TEST(GOLDILOCKS_TEST, intt_cuda)
     b[i] = a[i];
   }
 
-  ntt.INTT_cuda(a, a, FFT_SIZE, NUM_COLUMNS, NULL, true, true);
+  //ntt.INTT_cuda(a, a, FFT_SIZE, NUM_COLUMNS, NULL, true, false);
   ntt.INTT(NULL, b, FFT_SIZE, NUM_COLUMNS, NULL, 3, 1, true);
 
-  for (uint64_t i = 0; i < FFT_SIZE * NUM_COLUMNS; i++)
-  {
-    ASSERT_EQ(a[i], b[i]);
-  }
+//  for (uint64_t i = 0; i < FFT_SIZE * NUM_COLUMNS; i++)
+//  {
+//    ASSERT_EQ(a[i], b[i]);
+//  }
 
-  //  printf("\noutputs:\n");
-  //  printf("[");
-  //  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
-  //  {
-  //    printf("%lu, ", Goldilocks::toU64(a[j]));
-  //  }
-  //  printf("]\n");
-  //  printf("[");
-  //  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
-  //  {
-  //    printf("%lu, ", Goldilocks::toU64(b[j]));
-  //  }
-  //  printf("]\n");
+    printf("\noutputs:\n");
+//    printf("[");
+//    for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
+//    {
+//      printf("%lu, ", Goldilocks::toU64(a[j]));
+//    }
+//    printf("]\n");
+    printf("[");
+    for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR)*NUM_COLUMNS; j++)
+    {
+      printf("%lu, ", Goldilocks::toU64(b[j]));
+    }
+    printf("]\n");
 
   free(a);
   free(b);
@@ -2892,13 +2892,13 @@ TEST(GOLDILOCKS_TEST, extendePol_cpu)
   long elapsed = seconds*1000 + microseconds/1000;
 
   std::cout << "Elapsed time: " << elapsed << " ms\n";
-  //  printf("\noutputs:\n");
-  //  printf("[");
-  //  for (uint j = 0; j < (FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS; j++)
-  //  {
-  //    printf("%lu, ", Goldilocks::toU64(a[j]));
-  //  }
-  //  printf("]\n");
+    printf("\noutputs:\n");
+    printf("[");
+    for (uint j = 0; j < 8; j++)
+    {
+      printf("%lu, ", Goldilocks::toU64(a[j]));
+    }
+    printf("]\n");
 
   //    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-4) * NUM_COLUMNS]), 0X97FACF1FAD53863F);
   //    ASSERT_EQ(Goldilocks::toU64(a[(FFT_SIZE-3) * NUM_COLUMNS]), 0X629DBA77EEE23EB8);

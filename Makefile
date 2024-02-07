@@ -63,7 +63,7 @@ $(BUILD_DIR)/%.cc.o: %.cc
 .PHONY: clean
 
 testscpu: tests/tests.cpp $(ALLSRCS)
-	$(CXX) tests/tests.cpp src/*.cpp -lgtest -lgmp -g -Wall -pthread -fopenmp -mavx2 -o $@
+	$(CXX) tests/tests.cpp src/*.cpp -lgtest -lgmp -O3 -Wall -pthread -fopenmp -mavx2 -o $@
 
 OPTFLAG := -O3
 testsgpu: tests/tests.cpp $(ALLSRCS)
@@ -76,6 +76,10 @@ testsgpu: tests/tests.cpp $(ALLSRCS)
 	$(NVCC) -D__USE_CUDA__ -D__X1_PROVER__ -DFEATURE_GOLDILOCKS -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 cryptography_cuda/src/lib.cu -Icryptography_cuda/cuda -Icryptography_cuda/depends/blst/src -arch=$(CUDA_ARCH) $(OPTFLAG) -dc --output-file ntt_gpu.o
 	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) $(OPTFLAG) -dc --output-file poseidon_goldilocks_gpu.o
 	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -arch=$(CUDA_ARCH) $(OPTFLAG) -o $@ tests.o util.o goldilocks_base_field.o goldilocks_cubic_extension.o ntt_goldilocks.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o ntt_gpu.o -lgtest -lgmp
+
+runnew:
+	$(NVCC) -D__USE_CUDA__ -Xcompiler -mavx2 -arch=$(CUDA_ARCH) src/ntt_goldilocks.cu -o ntt
+	./ntt
 
 runtestscpu: testscpu
 	./testscpu --gtest_filter=GOLDILOCKS_TEST.merkletree_seq
@@ -122,9 +126,6 @@ runbenchcpu: benchcpu
 runbenchgpu: benchgpu
 	./benchgpu --benchmark_filter=MERKLETREE_BENCH_CUDA
 
-runnew:
-	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 -arch=$(CUDA_ARCH) -o ntt src/ntt_goldilocks.cu
-	./ntt
 
 clean:
 	$(RM) -r $(BUILD_DIR)

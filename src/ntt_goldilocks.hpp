@@ -181,7 +181,7 @@ public:
   void extendPol_cuda(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer = NULL, bool transpose = false);
   void NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, bool transpose = false);
   void INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, bool transpose = false, bool extend = false);
-  void init_twiddle_factors_cuda(u_int64_t device_id, u_int64_t lg_n);
+  void init_twiddle_factors_cuda(u_int32_t device_id, u_int32_t lg_n);
 #endif // __USE_CUDA__
 };
 

@@ -3,9 +3,11 @@
 #include <cuda_runtime.h>
 #include <sys/time.h>
 #include <stdint.h>
+#include "../src/cuda_utils.cuh"
 
 __global__ void addOneToEachElement(uint64_t *data, int N) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  printf("123\n");
   if (idx < N) {
     data[idx] = __brev(data[idx]);
   }
@@ -16,7 +18,7 @@ int main() {
   uint64_t *h_data = (uint64_t*)malloc(N * sizeof(uint64_t)); // 分配ht memory
   uint64_t *d_data; // 定义device memory指针
 
-  cudaMalloc((void**)&d_data, N * sizeof(uint64_t)); // 在device memor上分配内存
+  CHECKCUDAERR(cudaMalloc((void**)&d_data, N * sizeof(uint64_t))); // 在device memor上分配内存
 
   // 初始化host memory数据
   for (uint64_t i = 0; i < N; ++i) {
@@ -32,7 +34,7 @@ int main() {
   struct timeval start, end;
   gettimeofday(&start, NULL);
   // 将数据从host memory拷贝到device memory
-  cudaMemcpy(d_data, h_data, N * sizeof(uint64_t), cudaMemcpyHostToDevice);
+  CHECKCUDAERR(cudaMemcpy(d_data, h_data, N * sizeof(uint64_t), cudaMemcpyHostToDevice));
   gettimeofday(&end, NULL);
   long seconds = end.tv_sec - start.tv_sec;
   long microseconds = end.tv_usec - start.tv_usec;
@@ -44,7 +46,7 @@ int main() {
   addOneToEachElement<<<numBlocks, blockSize>>>(d_data, N);
   // 将数据从device memory拷贝回host memory
   gettimeofday(&start, NULL);
-  cudaMemcpy(h_data, d_data, N * sizeof(uint64_t), cudaMemcpyDeviceToHost);
+  CHECKCUDAERR(cudaMemcpy(h_data, d_data, N * sizeof(uint64_t), cudaMemcpyDeviceToHost));
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
   microseconds = end.tv_usec - start.tv_usec;
@@ -61,7 +63,7 @@ int main() {
   // 释放内存
 
   gettimeofday(&start, NULL);
-  cudaFree(d_data);
+  CHECKCUDAERR(cudaFree(d_data));
   free(h_data);
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
