@@ -78,7 +78,9 @@ testsgpu: tests/tests.cpp $(ALLSRCS)
 	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -arch=$(CUDA_ARCH) $(OPTFLAG) -o $@ tests.o util.o goldilocks_base_field.o goldilocks_cubic_extension.o ntt_goldilocks.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o ntt_gpu.o -lgtest -lgmp
 
 runnew:
-	$(NVCC) -D__USE_CUDA__ -Xcompiler -mavx2 -arch=$(CUDA_ARCH) src/ntt_goldilocks.cu -o ntt
+	$(CXX) src/goldilocks_base_field.cpp -fPIC $(OPTFLAG) -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_base_field.o
+	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -mavx2 -arch=$(CUDA_ARCH) $(OPTFLAG) src/ntt_goldilocks.cu -dc --output-file ntt_new.o
+	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -arch=$(CUDA_ARCH) $(OPTFLAG) -o ntt goldilocks_base_field.o ntt_new.o -lgtest -lgmp
 	./ntt
 
 runtestscpu: testscpu

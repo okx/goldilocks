@@ -53,13 +53,13 @@ void NTT_Goldilocks::NTT_iters(Goldilocks::Element *dst, Goldilocks::Element *sr
     tmp = a2;
   }
   reversePermutation(tmp, src, size, offset_cols, ncols, ncols_all);
-//      printf("\nafter reversePermutation:\n");
-//      printf("[");
-//      for (uint j = 0; j < size * ncols; j++)
-//      {
-//          printf("%lu, ", Goldilocks::toU64(tmp[j]));
-//      }
-//      printf("]\n");
+      printf("\nafter reversePermutation:\n");
+      printf("[");
+      for (uint j = 0; j < size * ncols && j<8; j++)
+      {
+          printf("%lu, ", Goldilocks::toU64(tmp[j]));
+      }
+      printf("]\n");
 
   if (iseven == false)
   {
@@ -353,12 +353,12 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
   computeR(N);
 
   INTT(output, input, N, ncols, tmp, nphase, nblock, true);
-//  printf("intt output:\n");
-//  printf("[");
-//  for (uint32_t i = 0; i <N*2; i++) {
-//    printf("%lu, ", Goldilocks::toU64(output[i]));
-//  }
-//  printf("]\n");
+  printf("intt output:\n");
+  printf("[");
+  for (uint32_t i = 0; i <N*2 && i<8; i++) {
+    printf("%lu, ", Goldilocks::toU64(output[i]));
+  }
+  printf("]\n");
   ntt_extension.NTT(output, output, N_Extended, ncols, tmp, nphase, nblock);
 
   if (buffer == NULL)
@@ -441,7 +441,7 @@ void NTT_Goldilocks::INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *sr
 #pragma omp parallel for schedule(static)
     for (u_int64_t j = 0; j < size; j++) {
       for (u_int64_t i = 0; i < ncols; i++) {
-        data[i*size+j] = src[jextendePol_cpu*ncols+i];
+        data[i*size+j] = src[j*ncols+i];
       }
     }
   } else {
@@ -543,13 +543,13 @@ void NTT_Goldilocks::extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Elemen
 
   INTT_cuda(data, data, N, ncols, NULL, false, true);
 
-      printf("\nINTT outputs:\n");
-      printf("[");
-      for (uint j = 0; j < N_Extended * ncols; j++)
-      {
-          printf("%lu, ", Goldilocks::toU64(data[j]));
-      }
-      printf("]\n");
+//      printf("\nINTT outputs:\n");
+//      printf("[");
+//      for (uint j = 0; j < N_Extended * ncols; j++)
+//      {
+//          printf("%lu, ", Goldilocks::toU64(data[j]));
+//      }
+//      printf("]\n");
 
   gettimeofday(&start, NULL);
 //  // can not be done in parallel, but the second half can be done in parallel

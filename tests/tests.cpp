@@ -9,11 +9,11 @@
 #include <immintrin.h>
 #include <sys/time.h>
 
-#define LOG_FFT_SIZE 6
+#define LOG_FFT_SIZE 23
 #define FFT_SIZE (uint64_t(1 << LOG_FFT_SIZE))
 #define NUM_REPS 5
 #define BLOWUP_FACTOR 1
-#define NUM_COLUMNS 5
+#define NUM_COLUMNS 2
 #define NPHASES 4
 #define NCOLS_HASH 128
 #define NROWS_HASH (1 << 6)

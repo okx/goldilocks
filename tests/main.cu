@@ -7,14 +7,13 @@
 
 __global__ void addOneToEachElement(uint64_t *data, int N) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  printf("123\n");
   if (idx < N) {
     data[idx] = __brev(data[idx]);
   }
 }
 
 int main() {
-  const u_int64_t N = (1<<3);
+  const u_int64_t N = (1<<23) * 88;
   uint64_t *h_data = (uint64_t*)malloc(N * sizeof(uint64_t)); // 分配ht memory
   uint64_t *d_data; // 定义device memory指针
 
@@ -41,12 +40,20 @@ int main() {
   long elapsed = seconds*1000 + microseconds/1000;
   printf("memcpy to device elapsed: %ld ms\n", elapsed);
   // 在device上执行每个数字加一的操作
+  gettimeofday(&start, NULL);
   int blockSize = 256;
   int numBlocks = (N + blockSize - 1) / blockSize;
   addOneToEachElement<<<numBlocks, blockSize>>>(d_data, N);
+  gettimeofday(&end, NULL);
+  seconds = end.tv_sec - start.tv_sec;
+  microseconds = end.tv_usec - start.tv_usec;
+  elapsed = seconds*1000 + microseconds/1000;
+  printf("kernel elapsed: %ld ms\n", elapsed);
   // 将数据从device memory拷贝回host memory
   gettimeofday(&start, NULL);
-  CHECKCUDAERR(cudaMemcpy(h_data, d_data, N * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+  CHECKCUDAERR(cudaMemcpy(h_data, d_data, N/2 * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+  CHECKCUDAERR(cudaMemcpy(h_data + N/2, d_data + N/2, N/2 * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
   microseconds = end.tv_usec - start.tv_usec;
@@ -64,12 +71,12 @@ int main() {
 
   gettimeofday(&start, NULL);
   CHECKCUDAERR(cudaFree(d_data));
-  free(h_data);
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
   microseconds = end.tv_usec - start.tv_usec;
   elapsed = seconds*1000 + microseconds/1000;
   printf("memcpy to device and free elapsed: %ld ms\n", elapsed);
+  free(h_data);
 
   return 0;
 }
