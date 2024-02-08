@@ -117,15 +117,24 @@ __device__ __constant__ uint64_t domain_size_inverse[33] = {
 #define SHIFT 7
 #define MAX_LOG_ITEMS 8
 
-
+__device__ bool TWIDDLE_FACTORS_FLAG[24];
+// log domain size of twiddle factors no more than 24
 __device__ gl64_t FORWARD_TWIDDLE_FACTORS[1<<24];
 __device__ gl64_t INVERSE_TWIDDLE_FACTORS[1<<24];
+// log domain size of r no more than 23
 __device__ gl64_t r[1<<24];
 
 
-__global__ void br_ntt_group(gl64_t *data, uint32_t i, uint32_t domain_size, uint32_t ncols, gl64_t *twiddles) {
+__global__ void br_ntt_group(gl64_t *data, uint32_t i, uint32_t domain_size, uint32_t ncols, bool inverse) {
   uint32_t j = blockIdx.x;
   uint32_t col = threadIdx.x;
+  uint32_t start = domain_size>>1;
+  gl64_t *twiddles;
+  if (inverse) {
+    twiddles = INVERSE_TWIDDLE_FACTORS + start;
+  } else {
+    twiddles = FORWARD_TWIDDLE_FACTORS + start;
+  }
   if (j < domain_size/2 && col < ncols) {
     uint32_t half_group_size = 1<<i;
     uint32_t group = j>>i; // j/(group_size/2);
@@ -139,51 +148,18 @@ __global__ void br_ntt_group(gl64_t *data, uint32_t i, uint32_t domain_size, uin
   }
 }
 
-__global__ void intt_scale(gl64_t *data, uint32_t domain_size, uint32_t log_domain_size, uint32_t ncols, gl64_t *r) {
+__global__ void intt_scale(gl64_t *data, uint32_t domain_size, uint32_t log_domain_size, uint32_t ncols, bool extend) {
   uint32_t j = blockIdx.x; // domain_size
   uint32_t col = threadIdx.x; //cols
   uint32_t index = j*ncols + col;
   gl64_t factor = gl64_t(domain_size_inverse[log_domain_size]);
-  if (r != NULL) {
-    factor *= r[j];
+  if (extend) {
+    factor *= r[domain_size+j];
   }
   if (index < domain_size*ncols) {
     data[index] = data[index] * factor;
   }
 }
-
-//__global__ void br_ntt_group_single(gl64_t *data, uint32_t domain_size, uint32_t log_domain_size, uint32_t ncols) {
-//    for (uint32_t i = 0; i < log_domain_size; i++) {
-//        uint32_t half_group_size = 1 << i;
-//        for (uint32_t j = 0; j < domain_size / 2; j++) {
-//            uint32_t group = j >> i; // j/(group_size/2);
-//            uint32_t offset = j & (half_group_size - 1); //j%(half_group_size);
-//            uint32_t index1 = (group << i + 1) + offset;
-//            uint32_t index2 = index1 + half_group_size;
-//            for (uint32_t col = 0; col < ncols; col++) {
-//                gl64_t odd_sub = data[index2 * ncols + col] * FORWARD_TWIDDLE_FACTORS[offset * domain_size >> i + 1];
-//                data[index2 * ncols + col] = data[index1 * ncols + col] - odd_sub;
-//                data[index1 * ncols + col] = data[index1 * ncols + col] + odd_sub;
-//            }
-//        }
-//    }
-//}
-//
-//__global__ void br_ntt_group_single2(gl64_t *data, uint32_t i, uint32_t domain_size, uint32_t log_domain_size, uint32_t ncols) {
-//  uint32_t j = blockIdx.x;
-//  uint32_t col = threadIdx.x;
-//  printf("bidx: %d, tidx: %d\n", j, col);
-//  if (j < domain_size/2 && col < ncols) {
-//    uint32_t half_group_size = 1<<i;
-//    uint32_t group = j>>i; // j/(group_size/2);
-//    uint32_t offset = j&(half_group_size-1); //j%(half_group_size);
-//    uint32_t index1 = (group<<i+1) + offset;
-//    uint32_t index2 = index1 + half_group_size;
-//    gl64_t odd_sub = data[index2*ncols+col] * FORWARD_TWIDDLE_FACTORS[offset * domain_size>>i+1];
-//    data[index2*ncols+col] = data[index1*ncols+col] - odd_sub;
-//    data[index1*ncols+col] = data[index1*ncols+col] + odd_sub;
-//  }
-//}
 
 __global__ void reverse_permutation(gl64_t *data, uint32_t log_domain_size, uint32_t ncols) {
   uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -198,103 +174,100 @@ __global__ void reverse_permutation(gl64_t *data, uint32_t log_domain_size, uint
   }
 }
 
-//__global__ void init_twiddle_factors(uint32_t log_domain_size) {
-//  FORWARD_TWIDDLE_FACTORS[0] = gl64_t::one();
-//  INVERSE_TWIDDLE_FACTORS[0] = gl64_t::one();
-//  r[0] = gl64_t::one();
-//  for (uint32_t i = 1; i<(1<<log_domain_size); i++) {
-//    FORWARD_TWIDDLE_FACTORS[i] = FORWARD_TWIDDLE_FACTORS[i - 1] * gl64_t(omegas[log_domain_size]);
-//    INVERSE_TWIDDLE_FACTORS[i] = INVERSE_TWIDDLE_FACTORS[i - 1] * gl64_t(omegas_inv[log_domain_size]);
-//    r[i] = r[i-1] * gl64_t(SHIFT);
-//  }
-//}
-//
-//__global__ void load_tf(gl64_t* dst, uint32_t log_domain_size) {
-//  for (uint32_t i = 0; i<(1<<log_domain_size); i++) {
-//    dst[i] = FORWARD_TWIDDLE_FACTORS[i];
-//  }
-//}
+__global__ void init_twiddle_factors_small_size(uint32_t log_domain_size) {
 
-__global__ void init_twiddle_factors_small_size(gl64_t* twiddles, uint32_t log_domain_size, bool inverse) {
-  gl64_t omega;
-  if (inverse) {
-    omega = gl64_t(omegas_inv[log_domain_size]);
-  } else {
-    omega = gl64_t(omegas[log_domain_size]);
-  }
-  twiddles[0] = gl64_t::one();
-  for (uint32_t i = 1; i<(1<<log_domain_size); i++) {
-    twiddles[i] = twiddles[i-1] * omega;
+  gl64_t omega = gl64_t(omegas[log_domain_size]);
+  gl64_t omega_inv = gl64_t(omegas_inv[log_domain_size]);
+
+  uint32_t start = 1<<log_domain_size-1;
+
+  FORWARD_TWIDDLE_FACTORS[start] = gl64_t::one();
+  INVERSE_TWIDDLE_FACTORS[start] = gl64_t::one();
+
+  for (uint32_t i = start + 1; i < start + (1<<log_domain_size-1); i++) {
+    FORWARD_TWIDDLE_FACTORS[i] = FORWARD_TWIDDLE_FACTORS[i-1] * omega;
+    INVERSE_TWIDDLE_FACTORS[i] = INVERSE_TWIDDLE_FACTORS[i-1] * omega_inv;
   }
 }
 
-__global__ void init_twiddle_factors_first_step(gl64_t* twiddles, uint32_t log_domain_size, bool inverse) {
-  gl64_t omega;
-  if (inverse) {
-    omega = gl64_t(omegas_inv[log_domain_size]);
-  } else {
-    omega = gl64_t(omegas[log_domain_size]);
-  }
-  twiddles[0] = gl64_t::one();
-  for (uint32_t i = 1; i<=1<<12; i++) {
-    twiddles[i] = twiddles[i-1] * omega;
+__global__ void init_twiddle_factors_first_step(uint32_t log_domain_size) {
+
+  gl64_t omega = gl64_t(omegas[log_domain_size]);
+  gl64_t omega_inv = gl64_t(omegas_inv[log_domain_size]);
+
+  uint32_t start = 1<<log_domain_size-1;
+
+  FORWARD_TWIDDLE_FACTORS[start] = gl64_t::one();
+  INVERSE_TWIDDLE_FACTORS[start] = gl64_t::one();
+
+  for (uint32_t i = start+1; i <= start+(1<<12); i++) {
+    FORWARD_TWIDDLE_FACTORS[i] = FORWARD_TWIDDLE_FACTORS[i-1] * omega;
+    INVERSE_TWIDDLE_FACTORS[i] = INVERSE_TWIDDLE_FACTORS[i-1] * omega_inv;
   }
 }
 
-__global__ void init_twiddle_factors_second_step(gl64_t* twiddles, uint32_t log_domain_size) {
+__global__ void init_twiddle_factors_second_step(uint32_t log_domain_size) {
   uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-  for (uint32_t i = 1; i<1<<log_domain_size-12; i++) {
-    twiddles[i*4096 + idx] = twiddles[(i-1)*4096 + idx] * twiddles[4096];
+  uint32_t start = 1<<log_domain_size-1;
+  for (uint32_t i = 1; i<1<<log_domain_size-13; i++) {
+    FORWARD_TWIDDLE_FACTORS[start + i*4096 + idx] = FORWARD_TWIDDLE_FACTORS[start + (i-1)*4096 + idx] * FORWARD_TWIDDLE_FACTORS[start + 4096];
+    INVERSE_TWIDDLE_FACTORS[start + i*4096 + idx] = INVERSE_TWIDDLE_FACTORS[start + (i-1)*4096 + idx] * INVERSE_TWIDDLE_FACTORS[start + 4096];
   }
 }
 
 
 
-__global__ void init_twiddle_factors(gl64_t* twiddles, uint32_t log_domain_size, bool inverse) {
-  if (log_domain_size <= 12) {
-    init_twiddle_factors_small_size<<<1, 1>>>(twiddles, log_domain_size, inverse);
+void init_twiddle_factors(uint32_t log_domain_size) {
+  if (log_domain_size <= 13) {
+    init_twiddle_factors_small_size<<<1, 1>>>(log_domain_size);
+    CHECKCUDAERR(cudaGetLastError());
   } else {
-    init_twiddle_factors_first_step<<<1, 1>>>(twiddles, log_domain_size, inverse);
-    init_twiddle_factors_second_step<<<1<<12, 1>>>(twiddles, log_domain_size);
+    init_twiddle_factors_first_step<<<1, 1>>>(log_domain_size);
+    CHECKCUDAERR(cudaGetLastError());
+    init_twiddle_factors_second_step<<<1<<12, 1>>>(log_domain_size);
+    CHECKCUDAERR(cudaGetLastError());
   }
 }
 
-__global__ void init_r_small_size(gl64_t *r, uint32_t log_domain_size) {
-  r[0] = gl64_t::one();
-  for (uint32_t i = 1; i<(1<<log_domain_size); i++) {
+__global__ void init_r_small_size(uint32_t log_domain_size) {
+  uint32_t start = 1<<log_domain_size;
+  r[start] = gl64_t::one();
+  for (uint32_t i = start+1; i<start+(1<<log_domain_size); i++) {
     r[i] = r[i-1] * gl64_t(SHIFT);
   }
 }
 
-__global__ void init_r_first_step(gl64_t *r) {
-  r[0] = gl64_t::one();
+__global__ void init_r_first_step(uint32_t log_domain_size) {
+  uint32_t start = 1<<log_domain_size;
+  r[start] = gl64_t::one();
   // init first 4097 elements and then init others in parallel
-  for (uint32_t i = 1; i<=1<<12; i++) {
+  for (uint32_t i = start+1; i<=start+(1<<12); i++) {
     r[i] = r[i-1] * gl64_t(SHIFT);
   }
 }
 
-__global__ void init_r_second_step(gl64_t *r, uint32_t log_domain_size) {
+__global__ void init_r_second_step(uint32_t log_domain_size) {
+  uint32_t start = 1<<log_domain_size;
   uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
   for (uint32_t i = 1; i<1<<log_domain_size-12; i++) {
-    r[i*4096 + idx] = r[(i-1)*4096 + idx] * r[4096];
+    r[start + i*4096 + idx] = r[start + (i-1)*4096 + idx] * r[start + 4096];
   }
 
 }
 
-void init_r(gl64_t *r, uint32_t log_domain_size) {
+void init_r(uint32_t log_domain_size) {
   if (log_domain_size <= 12) {
-    init_r_small_size<<<1,1>>>(r, log_domain_size);
+    init_r_small_size<<<1,1>>>(log_domain_size);
     CHECKCUDAERR(cudaGetLastError());
   } else {
-    init_r_first_step<<<1, 1>>>(r);
+    init_r_first_step<<<1, 1>>>(log_domain_size);
     CHECKCUDAERR(cudaGetLastError());
-    init_r_second_step<<<1<<12, 1>>>(r, log_domain_size);
+    init_r_second_step<<<1<<12, 1>>>(log_domain_size);
     CHECKCUDAERR(cudaGetLastError());
   }
 }
 
-void ntt_cuda(cudaStream_t stream, gl64_t *data, uint32_t log_domain_size, uint32_t ncols, bool inverse, gl64_t *twiddles, gl64_t *r) {
+void ntt_cuda(cudaStream_t stream, gl64_t *data, uint32_t log_domain_size, uint32_t ncols, bool inverse, bool extend) {
 
   uint32_t domain_size = 1<<log_domain_size;
 
@@ -335,7 +308,7 @@ void ntt_cuda(cudaStream_t stream, gl64_t *data, uint32_t log_domain_size, uint3
   gettimeofday(&start, NULL);
   //dim3 blockIdx = dim3(domain_size/2);
   for (uint32_t i = 0; i < log_domain_size; i++) {
-    br_ntt_group<<<domain_size/2, ncols, 0, stream>>>(data, i, domain_size, ncols, twiddles);
+    br_ntt_group<<<domain_size/2, ncols, 0, stream>>>(data, i, domain_size, ncols, inverse);
   }
   cudaStreamSynchronize(stream);
   gettimeofday(&end, NULL);
@@ -345,7 +318,7 @@ void ntt_cuda(cudaStream_t stream, gl64_t *data, uint32_t log_domain_size, uint3
   printf("br_ntt_group elapsed: %ld ms\n", elapsed);
   if (inverse) {
     gettimeofday(&start, NULL);
-    intt_scale<<<domain_size, ncols, 0, stream>>>(data, domain_size, log_domain_size, ncols, r);
+    intt_scale<<<domain_size, ncols, 0, stream>>>(data, domain_size, log_domain_size, ncols, extend);
     cudaStreamSynchronize(stream);
     gettimeofday(&end, NULL);
     seconds = end.tv_sec - start.tv_sec;
@@ -374,14 +347,7 @@ void init_input(Goldilocks::Element *a, uint32_t domain_size, uint32_t ncols) {
   }
 }
 
-//void init_twiddle_factors_cuda(u_int32_t device_id, u_int32_t log_domain_size) {
-//  CHECKCUDAERR(cudaSetDevice(device_id));
-//  init_twiddle_factors<<<1,1>>>(log_domain_size);
-//  CHECKCUDAERR(cudaGetLastError());
-//
-//}
-
-void NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, gl64_t *twiddles) {
+void NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols) {
   uint32_t domain_size = 1<<size;
   gl64_t *d_data;
   CHECKCUDAERR(cudaMalloc((void**)&d_data, domain_size * ncols * sizeof(gl64_t)));
@@ -390,7 +356,7 @@ void NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  ntt_cuda(stream, d_data, size, ncols, false, twiddles, NULL);
+  ntt_cuda(stream, d_data, size, ncols, false, false);
 
   cudaStreamDestroy(stream);
 
@@ -398,7 +364,7 @@ void NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size
   cudaFree(d_data);
 }
 
-void INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols, gl64_t *twiddles, gl64_t *r) {
+void INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols) {
   uint32_t domain_size = 1<<size;
   gl64_t *d_data;
   CHECKCUDAERR(cudaMalloc((void**)&d_data, domain_size * ncols * sizeof(gl64_t)));
@@ -407,7 +373,7 @@ void INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t siz
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  ntt_cuda(stream, d_data, size, ncols, true, twiddles, r);
+  ntt_cuda(stream, d_data, size, ncols, true, true);
 
   cudaStreamDestroy(stream);
 
@@ -416,7 +382,14 @@ void INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t siz
   cudaFree(d_data);
 }
 
-void extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t log_N_Extended, uint64_t log_N, uint64_t ncols, gl64_t *twiddles_ext, gl64_t *twiddles, gl64_t *r) {
+// TODO: use specific device
+void init_twiddle_factors_temp(u_int32_t device_id, u_int32_t lg_n) {
+  init_twiddle_factors(lg_n);
+  init_twiddle_factors(lg_n+1);
+  init_r(lg_n);
+}
+
+void extendPol_temp(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t log_N_Extended, uint64_t log_N, uint64_t ncols) {
   struct timeval start, end;
   gettimeofday(&start, NULL);
 
@@ -446,7 +419,7 @@ void extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t
 
   CHECKCUDAERR(cudaMemsetAsync(d_data + domain_size * ncols, 0, domain_size * ncols * sizeof(gl64_t), stream));
 
-  ntt_cuda(stream, d_data, log_N, ncols, true, twiddles, r);
+  ntt_cuda(stream, d_data, log_N, ncols, true, true);
 
 #ifdef  __PRINT_LOG__
   uint64_t *log = (uint64_t *)malloc(MAX_LOG_ITEMS * sizeof(uint64_t));
@@ -461,7 +434,7 @@ void extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t
   free(log);
 #endif
 
-  ntt_cuda(stream, d_data, log_N_Extended, ncols, false, twiddles_ext, NULL);
+  ntt_cuda(stream, d_data, log_N_Extended, ncols, false, false);
 
   cudaStreamSynchronize(stream);
 
@@ -470,8 +443,9 @@ void extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t
     gettimeofday(&start, NULL);
     uint32_t batch = 64;
     for (uint32_t i = 0; i < batch; i++) {
-      CHECKCUDAERR(cudaMemcpyAsync(dst + domain_size_ext * ncols/batch, d_data + domain_size_ext * ncols/batch, domain_size_ext * ncols/batch * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
+      CHECKCUDAERR(cudaMemcpyAsync(dst + i * domain_size_ext * ncols/batch, d_data + i * domain_size_ext * ncols/batch, domain_size_ext * ncols/batch * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
     }
+    //CHECKCUDAERR(cudaMemcpyAsync(dst, d_data, domain_size_ext * ncols * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
     cudaFree(d_data);
 
     gettimeofday(&end, NULL);
