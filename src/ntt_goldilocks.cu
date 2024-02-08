@@ -382,7 +382,14 @@ void INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t siz
   cudaFree(d_data);
 }
 
-void extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t log_N_Extended, uint64_t log_N, uint64_t ncols) {
+// TODO: use specific device
+void init_twiddle_factors_temp(u_int32_t device_id, u_int32_t lg_n) {
+  init_twiddle_factors(lg_n);
+  init_twiddle_factors(lg_n+1);
+  init_r(lg_n);
+}
+
+void extendPol_temp(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t log_N_Extended, uint64_t log_N, uint64_t ncols) {
   struct timeval start, end;
   gettimeofday(&start, NULL);
 
@@ -434,11 +441,11 @@ void extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t
   {
     struct timeval start, end;
     gettimeofday(&start, NULL);
-//    uint32_t batch = 64;
-//    for (uint32_t i = 0; i < batch; i++) {
-//      CHECKCUDAERR(cudaMemcpyAsync(dst + domain_size_ext * ncols/batch, d_data + domain_size_ext * ncols/batch, domain_size_ext * ncols/batch * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
-//    }
-    CHECKCUDAERR(cudaMemcpyAsync(dst, d_data, domain_size_ext * ncols * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
+    uint32_t batch = 64;
+    for (uint32_t i = 0; i < batch; i++) {
+      CHECKCUDAERR(cudaMemcpyAsync(dst + i * domain_size_ext * ncols/batch, d_data + i * domain_size_ext * ncols/batch, domain_size_ext * ncols/batch * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
+    }
+    //CHECKCUDAERR(cudaMemcpyAsync(dst, d_data, domain_size_ext * ncols * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
     cudaFree(d_data);
 
     gettimeofday(&end, NULL);
@@ -458,45 +465,45 @@ void extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t
 
 }
 
-int main() {
-  CHECKCUDAERR(cudaSetDevice(0)); 
-  uint32_t log_domain_size = 23;
-  uint32_t domain_size = 1<<log_domain_size;
-  uint32_t ncols = 168;
-  //uint64_t *a;
-  //cudaHostAlloc((void**)&a, 2*domain_size * ncols * sizeof(uint64_t), cudaHostAllocDefault);
-  uint64_t *a = (uint64_t *)malloc(2*domain_size * ncols * sizeof(uint64_t));
-  uint64_t *b = (uint64_t *)malloc(2*domain_size * ncols * sizeof(uint64_t));
-  init_input((Goldilocks::Element *)a, domain_size, ncols);
-
-#ifdef __PRINT_LOG__
-  printf("\ninputs:\n");
-  printf("[");
-  for (uint j = 0; j < domain_size * ncols && j < MAX_LOG_ITEMS; j++)
-  {
-    printf("%lu, ", a[j]);
-  }
-  printf("]\n");
-#endif
-
-  init_twiddle_factors(log_domain_size);
-  init_twiddle_factors(log_domain_size+1);
-  init_r(log_domain_size);
-
-  extendPol_cuda((Goldilocks::Element *)b, (Goldilocks::Element *)a, log_domain_size+1, log_domain_size, ncols);
-
-#ifdef __PRINT_LOG__
-  printf("\noutputs:\n");
-  printf("[");
-  for (uint j = 0; j < 2*domain_size * ncols && j<8; j++)
-  {
-    printf("%lu, ", b[j]);
-  }
-  printf("]\n");
-#endif
-
-  free(a);
-  //cudaFreeHost(a);
-  free(b);
-
-}
+//int main() {
+//  CHECKCUDAERR(cudaSetDevice(0));
+//  uint32_t log_domain_size = 23;
+//  uint32_t domain_size = 1<<log_domain_size;
+//  uint32_t ncols = 168;
+//  //uint64_t *a;
+//  //cudaHostAlloc((void**)&a, 2*domain_size * ncols * sizeof(uint64_t), cudaHostAllocDefault);
+//  uint64_t *a = (uint64_t *)malloc(2*domain_size * ncols * sizeof(uint64_t));
+//  uint64_t *b = (uint64_t *)malloc(2*domain_size * ncols * sizeof(uint64_t));
+//  init_input((Goldilocks::Element *)a, domain_size, ncols);
+//
+//#ifdef __PRINT_LOG__
+//  printf("\ninputs:\n");
+//  printf("[");
+//  for (uint j = 0; j < domain_size * ncols && j < MAX_LOG_ITEMS; j++)
+//  {
+//    printf("%lu, ", a[j]);
+//  }
+//  printf("]\n");
+//#endif
+//
+//  init_twiddle_factors(log_domain_size);
+//  init_twiddle_factors(log_domain_size+1);
+//  init_r(log_domain_size);
+//
+//  extendPol_temp((Goldilocks::Element *)b, (Goldilocks::Element *)a, log_domain_size+1, log_domain_size, ncols);
+//
+//#ifdef __PRINT_LOG__
+//  printf("\noutputs:\n");
+//  printf("[");
+//  for (uint j = 0; j < 2*domain_size * ncols && j<8; j++)
+//  {
+//    printf("%lu, ", b[j]);
+//  }
+//  printf("]\n");
+//#endif
+//
+//  free(a);
+//  //cudaFreeHost(a);
+//  free(b);
+//
+//}

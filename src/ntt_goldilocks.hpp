@@ -2,6 +2,7 @@
 #define NTT_GOLDILOCKS
 
 #include "goldilocks_base_field.hpp"
+#include "ntt_goldilocks.cuh"
 #include <cassert>
 #include <gmp.h>
 #include <omp.h>
@@ -178,10 +179,14 @@ public:
 #ifdef __USE_CUDA__
 #define DEFAULT_GPU 7
 #define TOTAL_GPU 1
-  void extendPol_cuda(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer = NULL, bool transpose = false);
+  void extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t log_N_Extended, uint64_t log_N, uint64_t ncols) {
+    extendPol_temp(dst, src, log_N_Extended, log_N, ncols);
+  }
   void NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, bool transpose = false);
   void INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, bool transpose = false, bool extend = false);
-  void init_twiddle_factors_cuda(u_int32_t device_id, u_int32_t lg_n);
+  void init_twiddle_factors_cuda(u_int32_t device_id, u_int32_t lg_n) {
+    init_twiddle_factors_temp(device_id, lg_n);
+  }
 #endif // __USE_CUDA__
 };
 
