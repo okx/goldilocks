@@ -492,7 +492,7 @@ int main() {
   CHECKCUDAERR(cudaSetDevice(0)); 
   uint32_t log_domain_size = 23;
   uint32_t domain_size = 1<<log_domain_size;
-  uint32_t ncols = 89;
+  uint32_t ncols = 84;
   //uint64_t *a;
   //cudaHostAlloc((void**)&a, 2*domain_size * ncols * sizeof(uint64_t), cudaHostAllocDefault);
   uint64_t *a = (uint64_t *)malloc(2*domain_size * ncols * sizeof(uint64_t));
