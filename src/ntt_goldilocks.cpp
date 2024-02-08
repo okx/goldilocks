@@ -47,7 +47,7 @@ void NTT_Goldilocks::NTT_iters(Goldilocks::Element *dst, Goldilocks::Element *sr
         iseven = false;
         tmp = a2;
     }
-    reversePermutation(tmp, src, size, offset_cols, ncols, ncols_all);
+    reversePermutation(tmp, src, size, offset_cols, ncols, ncols_all, nThreads);
     if (iseven == false)
     {
         tmp = a2;
@@ -240,7 +240,7 @@ void NTT_Goldilocks::NTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_i
  * @param ncols number of columns of destination array
  * @param ncols_all number of columns of source array (ncols = nocols_all if nblock == 1)
  */
-void NTT_Goldilocks::reversePermutation(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all)
+void NTT_Goldilocks::reversePermutation(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, uint32_t numThreads)
 {
     uint32_t domainSize = log2(size);
     if (dst != src)

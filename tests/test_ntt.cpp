@@ -178,7 +178,7 @@ int test(char* path, int testId) {
     gettimeofday(&start, NULL);
     // ntt.INTT(tmp, idata, iparams[0], iparams[1], NULL, 3, 1, true);
     // ntt.NTT_BatchGPU(tree2, tmp, 2*iparams[0], iparams[1], 80, NULL, 3, false, false, true);
-    ntt.LDE_MerkleTree_MultiGPU_v2(tree2, idata, iparams[0], 2*iparams[0], iparams[1], tmp2);
+    ntt.LDE_MerkleTree_MultiGPU_v3(tree2, idata, iparams[0], 2*iparams[0], iparams[1], tmp2);
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("LDE + Merkle Tree on GPU time: %lu ms\n", t / 1000);
@@ -373,7 +373,7 @@ int test_lde_merkle_random() {
 
     struct timeval start, end;
 
-    uint64_t ncols = 640;
+    uint64_t ncols = 84;
     uint64_t ine = ncols * (1 << 23);
     uint64_t one = 2 * ine; // blowup factor 2
     uint64_t n = ine / ncols;
@@ -406,8 +406,8 @@ int test_lde_merkle_random() {
     printf("Extend on CPU time: %lu ms\n", t / 1000);
 
     gettimeofday(&start, NULL);
-    // ntt.LDE_MerkleTree_GPU(tree2, idata, n, n_ext, ncols, tmp);
-    ntt.LDE_MerkleTree_MultiGPU(tree2, idata, n, n_ext, ncols, tmp2);
+    ntt.LDE_MerkleTree_GPU_v3(tree2, idata, n, n_ext, ncols);
+    // ntt.LDE_MerkleTree_MultiGPU(tree2, idata, n, n_ext, ncols, tmp2);
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("Extend on GPU time: %lu ms\n", t / 1000);
@@ -486,13 +486,13 @@ int test_lde_merkle_batch_random() {
 }
 
 int main(int argc, char **argv) {
-    assert(1 == test((char*)"/data/workspace/dumi/x1-prover", 0));
+    // assert(1 == test((char*)"/data/workspace/dumi/x1-prover", 0));
 
     // assert(1 == test_random());
 
     // assert(1 == test_lde_no_merkle_random());
 
-    // assert(1 == test_lde_merkle_random());
+    assert(1 == test_lde_merkle_random());
 
     // assert(1 == test_ntt_partial_hash_random());
 

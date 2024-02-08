@@ -12,7 +12,7 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 
 // CUDA Threads per Block
-#define TPB 128
+#define TPB 64
 
 #define MAX_WIDTH 12
 
@@ -29,6 +29,7 @@ __device__ __forceinline__ void pow7(gl64_t &x)
 __device__ __forceinline__ void pow7_(gl64_t *x)
 {
     gl64_t x2[SPONGE_WIDTH], x3[SPONGE_WIDTH], x4[SPONGE_WIDTH];
+#pragma unroll
     for (int i = 0; i < SPONGE_WIDTH; ++i)
     {
         x2[i] = x[i] * x[i];
@@ -40,6 +41,7 @@ __device__ __forceinline__ void pow7_(gl64_t *x)
 
 __device__ __forceinline__ void add_(gl64_t *x, const gl64_t C[SPONGE_WIDTH])
 {
+#pragma unroll
     for (int i = 0; i < SPONGE_WIDTH; ++i)
     {
         x[i] = x[i] + C[i];
@@ -48,6 +50,7 @@ __device__ __forceinline__ void add_(gl64_t *x, const gl64_t C[SPONGE_WIDTH])
 
 __device__ __forceinline__ void prod_(gl64_t *x, const gl64_t alpha, const gl64_t C[SPONGE_WIDTH])
 {
+#pragma unroll
     for (int i = 0; i < SPONGE_WIDTH; ++i)
     {
         x[i] = alpha * C[i];
@@ -57,6 +60,7 @@ __device__ __forceinline__ void prod_(gl64_t *x, const gl64_t alpha, const gl64_
 __device__ __forceinline__ void pow7add_(gl64_t *x, const gl64_t C[SPONGE_WIDTH])
 {
     gl64_t x2[SPONGE_WIDTH], x3[SPONGE_WIDTH], x4[SPONGE_WIDTH];
+#pragma unroll
     for (int i = 0; i < SPONGE_WIDTH; ++i)
     {
         x2[i] = x[i] * x[i];
@@ -70,6 +74,7 @@ __device__ __forceinline__ void pow7add_(gl64_t *x, const gl64_t C[SPONGE_WIDTH]
 __device__ __forceinline__ gl64_t dot_(gl64_t *x, const gl64_t C[SPONGE_WIDTH])
 {
     gl64_t s0 = x[0] * C[0];
+#pragma unroll
     for (int i = 1; i < SPONGE_WIDTH; i++)
     {
         s0 = s0 + x[i] * C[i];
@@ -77,18 +82,17 @@ __device__ __forceinline__ gl64_t dot_(gl64_t *x, const gl64_t C[SPONGE_WIDTH])
     return s0;
 }
 
-__device__ __forceinline__ void mvp_(gl64_t *state, const gl64_t mat[SPONGE_WIDTH][SPONGE_WIDTH])
+__device__ __forceinline__ void mvp_(gl64_t *state, const gl64_t* mat)
 {
     gl64_t old_state[SPONGE_WIDTH];
     mymemcpy((uint64_t*)old_state, (uint64_t*)state, SPONGE_WIDTH);
 
     for (int i = 0; i < SPONGE_WIDTH; i++)
     {
-
-        state[i] = mat[0][i] * old_state[0];
+        state[i] = mat[i] * old_state[0];
         for (int j = 1; j < SPONGE_WIDTH; j++)
         {
-            state[i] = state[i] + (mat[j][i] * old_state[j]);
+            state[i] = state[i] + (mat[12 * j + i] * old_state[j]);
         }
     }
 }
@@ -96,26 +100,8 @@ __device__ __forceinline__ void mvp_(gl64_t *state, const gl64_t mat[SPONGE_WIDT
 // Constants defined in "poseidon_goldilocks_constants.hpp"
 __device__ __constant__ uint64_t GPU_C[118];
 __device__ __constant__ uint64_t GPU_S[507];
-__device__ __constant__ uint64_t GPU_M[12][12];
-__device__ __constant__ uint64_t GPU_P[12][12];
-// Constants loaded in gl64_t objects
-__device__ gl64_t GPU_M_GL[12][12];
-__device__ gl64_t GPU_P_GL[12][12];
-
-__global__ void init_gl64_const()
-{
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid >= 1)
-        return;
-    for (u32 i = 0; i < 12; i++)
-    {
-        for (u32 j = 0; j < 12; j++)
-        {
-            GPU_M_GL[i][j] = GPU_M[i][j];
-            GPU_P_GL[i][j] = GPU_P[i][j];
-        }
-    }
-}
+__device__ __constant__ uint64_t GPU_M[144];
+__device__ __constant__ uint64_t GPU_P[144];
 
 void init_gpu_const(int nDevices = 0)
 {
@@ -130,18 +116,13 @@ void init_gpu_const(int nDevices = 0)
         CHECKCUDAERR(cudaMemcpyToSymbol(GPU_P, PoseidonGoldilocksConstants::P, 144 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
         CHECKCUDAERR(cudaMemcpyToSymbol(GPU_C, PoseidonGoldilocksConstants::C, 118 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
         CHECKCUDAERR(cudaMemcpyToSymbol(GPU_S, PoseidonGoldilocksConstants::S, 507 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
-        init_gl64_const<<<1, 1>>>();
     }
     CHECKCUDAERR(cudaSetDevice(0));
 }
 
-__device__ void hash_full_result_seq(gl64_t *state, const gl64_t *input)
+__device__ void hash_full_result_seq(gl64_t *state, const gl64_t *input, const gl64_t *GPU_C_GL, const gl64_t *GPU_S_GL, const gl64_t *GPU_M_GL, const gl64_t *GPU_P_GL)
 {
-    const gl64_t *GPU_C_GL = (gl64_t *)GPU_C;
-    const gl64_t *GPU_S_GL = (gl64_t *)GPU_S;
-
-    const int length = SPONGE_WIDTH * sizeof(gl64_t);
-    std::memcpy(state, input, length);
+    mymemcpy((uint64_t*)state, (uint64_t*)input, SPONGE_WIDTH);    
 
     add_(state, GPU_C_GL);
     for (int r = 0; r < HALF_N_FULL_ROUNDS - 1; r++)
@@ -175,10 +156,25 @@ __device__ void hash_full_result_seq(gl64_t *state, const gl64_t *input)
 
 /* --- integration --- */
 
-__device__ void linear_hash_one(gl64_t *output, gl64_t *input, uint32_t size)
+__device__ void linear_hash_one(gl64_t *output, gl64_t *input, uint32_t size, int tid)
 {
     u32 remaining = size;
+    __shared__ gl64_t GPU_C_SM[118];
+    __shared__ gl64_t GPU_S_SM[507];
+    __shared__ gl64_t GPU_M_SM[144];
+    __shared__ gl64_t GPU_P_SM[144];
+
+    if (tid == 0)
+    {
+        mymemcpy((uint64_t*)GPU_C_SM, GPU_C, 118);
+        mymemcpy((uint64_t*)GPU_S_SM, GPU_S, 507);
+        mymemcpy((uint64_t*)GPU_M_SM, GPU_M, 144);
+        mymemcpy((uint64_t*)GPU_P_SM, GPU_P, 144);
+    }
+    __syncthreads();
+  
     gl64_t state[SPONGE_WIDTH];
+    
 
     if (size <= CAPACITY)
     {
@@ -200,21 +196,28 @@ __device__ void linear_hash_one(gl64_t *output, gl64_t *input, uint32_t size)
         u32 n = (remaining < RATE) ? remaining : RATE;
         mymemset((uint64_t*)&state[n], 0, (RATE - n));
         mymemcpy((uint64_t*)state, (uint64_t*)(input + (size - remaining)), n);
-        hash_full_result_seq(state, state);
+        hash_full_result_seq(state, state, GPU_C_SM, GPU_S_SM, GPU_M_SM, GPU_P_SM);
         remaining -= n;
     }
-    if (size > 0)
-    {
-        mymemcpy((uint64_t*)output, (uint64_t*)state, CAPACITY);
-    }
-    else
-    {
-        mymemset((uint64_t*)output, 0, CAPACITY);
-    }
+    mymemcpy((uint64_t*)output, (uint64_t*)state, CAPACITY);    
 }
 
-__device__ void linear_partial_hash_one(gl64_t *input, uint32_t size, gl64_t *state)
+__device__ void linear_partial_hash_one(gl64_t *input, uint32_t size, gl64_t *state, int tid)
 {
+    __shared__ gl64_t GPU_C_SM[118];
+    __shared__ gl64_t GPU_S_SM[507];
+    __shared__ gl64_t GPU_M_SM[144];
+    __shared__ gl64_t GPU_P_SM[144];
+
+    if (tid == 0)
+    {
+        mymemcpy((uint64_t*)GPU_C_SM, GPU_C, 118);
+        mymemcpy((uint64_t*)GPU_S_SM, GPU_S, 507);
+        mymemcpy((uint64_t*)GPU_M_SM, GPU_M, 144);
+        mymemcpy((uint64_t*)GPU_P_SM, GPU_P, 144);
+    }
+    __syncthreads();
+
     u32 remaining = size;
 
     while (remaining)
@@ -223,7 +226,7 @@ __device__ void linear_partial_hash_one(gl64_t *input, uint32_t size, gl64_t *st
         u32 n = (remaining < RATE) ? remaining : RATE;
         mymemset((uint64_t*)&state[n], 0, (RATE - n));
         mymemcpy((uint64_t*)state, (uint64_t*)(input + (size - remaining)), n);
-        hash_full_result_seq(state, state);
+        hash_full_result_seq(state, state, GPU_C_SM, GPU_S_SM, GPU_M_SM, GPU_P_SM);
         remaining -= n;
     }
 }
@@ -236,7 +239,7 @@ __global__ void linear_hash_gpu(uint64_t *output, uint64_t *input, uint32_t size
 
     gl64_t *inp = (gl64_t *)(input + tid * size);
     gl64_t *out = (gl64_t *)(output + tid * CAPACITY);
-    linear_hash_one(out, inp, size);
+    linear_hash_one(out, inp, size, threadIdx.x);
 }
 
 __global__ void linear_partial_init_hash_gpu(uint64_t *gstate, int32_t num_rows)
@@ -259,7 +262,7 @@ __global__ void linear_partial_hash_gpu(uint64_t *input, uint32_t num_cols, uint
     {
         gl64_t *inp = (gl64_t *)(input + (tid * hash_per_thread + i) * num_cols);
         gl64_t *state = (gl64_t *)(gstate + (tid * hash_per_thread + i) * SPONGE_WIDTH);
-        linear_partial_hash_one(inp, num_cols, state);
+        linear_partial_hash_one(inp, num_cols, state, threadIdx.x);
     }
 }
 
@@ -284,10 +287,24 @@ __global__ void linear_partial_copy_hash_gpu(uint64_t *output, uint64_t *gstate,
     */
 }
 
-__device__ void hash_one(gl64_t *state, gl64_t *const input)
+__device__ void hash_one(gl64_t *state, gl64_t *const input, int tid)
 {
+    __shared__ gl64_t GPU_C_SM[118];
+    __shared__ gl64_t GPU_S_SM[507];
+    __shared__ gl64_t GPU_M_SM[144];
+    __shared__ gl64_t GPU_P_SM[144];
+
+    if (tid == 0)
+    {
+        mymemcpy((uint64_t*)GPU_C_SM, GPU_C, 118);
+        mymemcpy((uint64_t*)GPU_S_SM, GPU_S, 507);
+        mymemcpy((uint64_t*)GPU_M_SM, GPU_M, 144);
+        mymemcpy((uint64_t*)GPU_P_SM, GPU_P, 144);
+    }
+    __syncthreads();
+
     gl64_t aux[SPONGE_WIDTH];
-    hash_full_result_seq(aux, input);
+    hash_full_result_seq(aux, input, GPU_C_SM, GPU_S_SM, GPU_M_SM, GPU_P_SM);
     mymemcpy((uint64_t*)state, (uint64_t*)aux, CAPACITY);
 }
 
@@ -300,7 +317,7 @@ __global__ void hash_gpu(uint32_t nextN, uint32_t nextIndex, uint32_t pending, u
     gl64_t pol_input[SPONGE_WIDTH];
     mymemset((uint64_t*)pol_input, 0, SPONGE_WIDTH);
     mymemcpy((uint64_t*)pol_input, (uint64_t*)&cursor[nextIndex + tid * RATE], RATE);
-    hash_one((gl64_t *)(&cursor[nextIndex + (pending + tid) * CAPACITY]), pol_input);
+    hash_one((gl64_t *)(&cursor[nextIndex + (pending + tid) * CAPACITY]), pol_input, threadIdx.x);
 }
 
 void merkletree_cuda_batch(Goldilocks::Element *tree, uint64_t *dst_gpu_tree, uint64_t *gpu_tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, uint64_t dim, uint32_t const gpu_id)
@@ -358,12 +375,13 @@ void merkletree_cuda_batch(Goldilocks::Element *tree, uint64_t *dst_gpu_tree, ui
 
 void merkletree_cuda_multi_gpu(Goldilocks::Element *tree, uint64_t *dst_gpu_tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, int nThreads, uint64_t dim, uint32_t const ngpu)
 {
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, 0);
+    // cudaDeviceProp prop;
+    // cudaGetDeviceProperties(&prop, 0);
     uint64_t numElementsTree = MerklehashGoldilocks::getTreeNumElements(num_rows);
-    size_t totalMemNeeded = num_rows * num_cols * dim * sizeof(uint64_t) + numElementsTree * sizeof(uint64_t);
-    size_t maxMem = prop.totalGlobalMem * 8 / 10 * ngpu;
-    bool use_batch = (totalMemNeeded >= maxMem);
+    // size_t totalMemNeeded = num_rows * num_cols * dim * sizeof(uint64_t) + numElementsTree * sizeof(uint64_t);
+    // size_t maxMem = prop.totalGlobalMem * 8 / 10 * ngpu;
+    // bool use_batch = (totalMemNeeded >= maxMem);
+    bool use_batch = false;
     size_t rowsDevice = num_rows / ngpu;
     uint64_t numElementsTreeDevice = rowsDevice * CAPACITY;
     uint64_t **gpu_input = (uint64_t **)malloc(ngpu * sizeof(uint64_t *));
@@ -490,7 +508,7 @@ void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full(Goldilocks::Element *tre
 #ifdef GPU_TIMING
         for (uint32_t d = 0; d < ngpu; d++)
         {
-            CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
+            CHECKCUDAERR(cudaStreamSynchronize(gpu_streams[d]));
         }
         TimerStopAndLog(merkletree_cuda_multi_gpu_kernel);
         TimerStart(merkletree_cuda_multi_gpu_copyPeer2Peer);

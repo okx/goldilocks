@@ -91,7 +91,7 @@ tnttcpu: tests/test_ntt.cpp $(ALLSRCS)
 	$(CXX) tests/test_ntt.cpp src/*.cpp -lgtest -lgmp -O3 -Wall -pthread -fopenmp -mavx2 -o $@
 
 tnttgpu: tests/test_ntt.cpp $(ALLSRCS)
-	$(CXX) -D__USE_CUDA__ -I/usr/local/cuda/include tests/test_ntt.cpp -O3 -pthread -fopenmp -mavx2 -c
+	$(CXX) -D__USE_CUDA__ tests/test_ntt.cpp -O3 -pthread -fopenmp -mavx2 -c
 	$(CXX) src/goldilocks_base_field.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_base_field.o
 	$(CXX) utils/timer.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o timer.o
 	$(CXX) -D__USE_CUDA__ src/poseidon_goldilocks.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o poseidon_goldilocks.o
