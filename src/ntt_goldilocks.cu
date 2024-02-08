@@ -77,39 +77,39 @@ __device__ __constant__ uint64_t omegas_inv[33] = {
 };
 
 __device__ __constant__ uint64_t domain_size_inverse[33] = {
-      0x0000000000000001,  // 1^{-1}
-      0x7fffffff80000001,  // 2^{-1}
-      0xbfffffff40000001,  // (1 << 2)^{-1}
-      0xdfffffff20000001,  // (1 << 3)^{-1}
-      0xefffffff10000001,
-      0xf7ffffff08000001,
-      0xfbffffff04000001,
-      0xfdffffff02000001,
-      0xfeffffff01000001,
-      0xff7fffff00800001,
-      0xffbfffff00400001,
-      0xffdfffff00200001,
-      0xffefffff00100001,
-      0xfff7ffff00080001,
-      0xfffbffff00040001,
-      0xfffdffff00020001,
-      0xfffeffff00010001,
-      0xffff7fff00008001,
-      0xffffbfff00004001,
-      0xffffdfff00002001,
-      0xffffefff00001001,
-      0xfffff7ff00000801,
-      0xfffffbff00000401,
-      0xfffffdff00000201,
-      0xfffffeff00000101,
-      0xffffff7f00000081,
-      0xffffffbf00000041,
-      0xffffffdf00000021,
-      0xffffffef00000011,
-      0xfffffff700000009,
-      0xfffffffb00000005,
-      0xfffffffd00000003,
-      0xfffffffe00000002,  // (1 << 32)^{-1}
+    0x0000000000000001,  // 1^{-1}
+    0x7fffffff80000001,  // 2^{-1}
+    0xbfffffff40000001,  // (1 << 2)^{-1}
+    0xdfffffff20000001,  // (1 << 3)^{-1}
+    0xefffffff10000001,
+    0xf7ffffff08000001,
+    0xfbffffff04000001,
+    0xfdffffff02000001,
+    0xfeffffff01000001,
+    0xff7fffff00800001,
+    0xffbfffff00400001,
+    0xffdfffff00200001,
+    0xffefffff00100001,
+    0xfff7ffff00080001,
+    0xfffbffff00040001,
+    0xfffdffff00020001,
+    0xfffeffff00010001,
+    0xffff7fff00008001,
+    0xffffbfff00004001,
+    0xffffdfff00002001,
+    0xffffefff00001001,
+    0xfffff7ff00000801,
+    0xfffffbff00000401,
+    0xfffffdff00000201,
+    0xfffffeff00000101,
+    0xffffff7f00000081,
+    0xffffffbf00000041,
+    0xffffffdf00000021,
+    0xffffffef00000011,
+    0xfffffff700000009,
+    0xfffffffb00000005,
+    0xfffffffd00000003,
+    0xfffffffe00000002,  // (1 << 32)^{-1}
 };
 
 // CUDA Threads Per Block
@@ -357,21 +357,21 @@ void ntt_cuda(cudaStream_t stream, gl64_t *data, uint32_t log_domain_size, uint3
 }
 
 void init_input(Goldilocks::Element *a, uint32_t domain_size, uint32_t ncols) {
-    for (uint64_t i = 0; i < 2; i++)
+  for (uint64_t i = 0; i < 2; i++)
+  {
+    for (uint64_t j = 0; j < ncols; j++)
     {
-        for (uint64_t j = 0; j < ncols; j++)
-        {
-            a[i * ncols + j] = Goldilocks::fromU64(1+j);
-        }
+      a[i * ncols + j] = Goldilocks::fromU64(1+j);
     }
+  }
 
-    for (uint64_t i = 2; i < domain_size; i++)
+  for (uint64_t i = 2; i < domain_size; i++)
+  {
+    for (uint64_t j = 0; j < ncols; j++)
     {
-        for (uint64_t j = 0; j < ncols; j++)
-        {
-            a[i * ncols + j] = a[ncols * (i - 1) + j] + a[ncols * (i - 2) + j];
-        }
+      a[i * ncols + j] = a[ncols * (i - 1) + j] + a[ncols * (i - 2) + j];
     }
+  }
 }
 
 //void init_twiddle_factors_cuda(u_int32_t device_id, u_int32_t log_domain_size) {
@@ -465,27 +465,30 @@ void extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t
 
   cudaStreamSynchronize(stream);
 
-  gettimeofday(&end, NULL);
-  seconds = end.tv_sec - start.tv_sec;
-  microseconds = end.tv_usec - start.tv_usec;
-  elapsed = seconds*1000 + microseconds/1000;
-  printf("extendPol_cuda elapsed: %ld ms\n", elapsed);
+  {
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+    uint32_t batch = 64;
+    for (uint32_t i = 0; i < batch; i++) {
+      CHECKCUDAERR(cudaMemcpyAsync(dst + domain_size_ext * ncols/batch, d_data + domain_size_ext * ncols/batch, domain_size_ext * ncols/batch * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
+    }
+    cudaFree(d_data);
 
-
-  gettimeofday(&start, NULL);
-
-  uint32_t batch = 64;
-  for (uint32_t i = 0; i < batch; i++) {
-    CHECKCUDAERR(cudaMemcpyAsync(dst + domain_size_ext * ncols/batch, d_data + domain_size_ext * ncols/batch, domain_size_ext * ncols/batch * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
+    gettimeofday(&end, NULL);
+    seconds = end.tv_sec - start.tv_sec;
+    microseconds = end.tv_usec - start.tv_usec;
+    elapsed = seconds*1000 + microseconds/1000;
+    printf("cudaMemcpy elapsed: %ld ms\n", elapsed);
   }
+
   cudaStreamDestroy(stream);
-  cudaFree(d_data);
 
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
   microseconds = end.tv_usec - start.tv_usec;
   elapsed = seconds*1000 + microseconds/1000;
-  printf("cudaMemcpy elapsed: %ld ms\n", elapsed);
+  printf("extendPol_cuda total elapsed: %ld ms\n", elapsed);
+
 }
 
 int main() {
