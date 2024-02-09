@@ -321,7 +321,7 @@ int test_lde_no_merkle_random() {
 
     struct timeval start, end;
 
-    uint64_t ncols = 80;
+    uint64_t ncols = 84;
     uint64_t ine = ncols * (1 << 23);
     uint64_t one = ine << 1; // blowup factor 2
     uint64_t n = ine / ncols;
@@ -340,7 +340,7 @@ int test_lde_no_merkle_random() {
 #ifdef __USE_CUDA__
     ntt.setUseGPU(true);
 #endif
-    ntt.computeR(n_ext);
+    ntt.computeR(n);
 
     gettimeofday(&start, NULL);
     ntt.LDE_MerkleTree_CPU(odata1, idata, n, n_ext, ncols, tmp, false); // false means do not build the Merkle Tree
@@ -350,7 +350,8 @@ int test_lde_no_merkle_random() {
 
     gettimeofday(&start, NULL);
     // ntt.LDE_MerkleTree_GPU(odata2, idata, n, n_ext, ncols, tmp, false); // false means do not build the Merkle Tree
-    ntt.LDE_MerkleTree_MultiGPU(odata2, idata, n, n_ext, ncols, tmp, 3, false);
+    // ntt.LDE_MerkleTree_MultiGPU(odata2, idata, n, n_ext, ncols, tmp, 3, false);
+    ntt.LDE_MerkleTree_GPU_v3(odata2, idata, n, n_ext, ncols, tmp, false); // false means do not build the Merkle Tree
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("Extend on GPU time: %lu ms\n", t / 1000);
@@ -397,7 +398,7 @@ int test_lde_merkle_random() {
 #ifdef __USE_CUDA__
     ntt.setUseGPU(true);
 #endif
-    ntt.computeR(n_ext);
+    ntt.computeR(n);
 
     gettimeofday(&start, NULL);
     ntt.LDE_MerkleTree_CPU(tree1, idata, n, n_ext, ncols, tmp1);
@@ -490,7 +491,7 @@ int main(int argc, char **argv) {
 
     // assert(1 == test_random());
 
-    // assert(1 == test_lde_no_merkle_random());
+    assert(1 == test_lde_no_merkle_random());
 
     assert(1 == test_lde_merkle_random());
 

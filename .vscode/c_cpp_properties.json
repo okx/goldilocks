@@ -2,15 +2,15 @@
     "configurations": [
         {
             "name": "Linux",
-            "includePath": [
-                "${workspaceFolder}/**"
+            "includePath": [                
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/utils"                
             ],
-            "defines": [],
-            "compilerPath": "/usr/bin/gcc",
+            "defines": ["__USE_CUDA__"],
+            "compilerPath": "/usr/local/cuda/bin/nvcc",
             "cStandard": "c17",
             "cppStandard": "gnu++17",
-            "intelliSenseMode": "linux-gcc-x64",
-            "configurationProvider": "ms-vscode.makefile-tools"
+            "intelliSenseMode": "linux-gcc-x64"            
         }
     ],
     "version": 4
