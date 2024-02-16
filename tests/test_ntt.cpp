@@ -105,16 +105,17 @@ Goldilocks::Element *random_data(size_t total_elem)
     return data;
 }
 
-
 // compare output with the reference output
 int comp_output(Goldilocks::Element *in, Goldilocks::Element *ref, size_t nelem)
 {
+    printf("Compare %lu elements ...\n", nelem);
 // #pragma omp parallel for
     for (size_t i = 0; i < nelem; i++)
     {
         if (in[i].fe != ref[i].fe)
         {
             printf("!!! Data are different at index %lu\n", i);
+            printf("%lu vs. %lu\n", in[i].fe, ref[i].fe);
             return 0;
         }
     }
@@ -139,7 +140,7 @@ int test(char* path, int testId) {
     uint64_t ine, one;
     // Goldilocks::Element * idata = read_file(ifilename, &ine, iparams);
     read_file_v3(ifilename, &ine, iparams);
-    iparams[1] = 640;
+    // iparams[1] = 640;
     ine = iparams[0] * iparams[1];
     one = 2 * ine;
     Goldilocks::Element * idata1 = map_file(ifilename, ine + 6);
@@ -160,7 +161,8 @@ int test(char* path, int testId) {
 #ifdef __USE_CUDA__
     ntt.setUseGPU(true);
 #endif
-    ntt.computeR(2 * iparams[0]);
+    // IMPORTANT: it needs to be done for the original size, not extended
+    ntt.computeR(iparams[0]);
 
     // warmup
     ntt.NTT(tmp, idata, iparams[0], iparams[1]);
@@ -178,13 +180,21 @@ int test(char* path, int testId) {
     gettimeofday(&start, NULL);
     // ntt.INTT(tmp, idata, iparams[0], iparams[1], NULL, 3, 1, true);
     // ntt.NTT_BatchGPU(tree2, tmp, 2*iparams[0], iparams[1], 80, NULL, 3, false, false, true);
-    ntt.LDE_MerkleTree_MultiGPU_v3(tree2, idata, iparams[0], 2*iparams[0], iparams[1], tmp2);
+    // ntt.LDE_MerkleTree_GPU_v3(tree2, idata, iparams[0], 2 * iparams[0], iparams[1]);
+    ntt.LDE_MerkleTree_MultiGPU_v3(tree2, idata, iparams[0], 2 * iparams[0], iparams[1], tmp2);
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("LDE + Merkle Tree on GPU time: %lu ms\n", t / 1000);
 
     // free(idata);
     munmap(idata1, (ine + 6) * sizeof(Goldilocks::Element));
+
+    // here we make sure data is in canonical form
+#pragma omp parallel for
+    for (size_t i = 0; i < ine; i++)
+    {
+        tmp2[i] = Goldilocks::fromU64(Goldilocks::toU64(tmp2[i]));
+    }
 
     int ret = comp_output(tmp, tmp2, one);
 
@@ -487,13 +497,13 @@ int test_lde_merkle_batch_random() {
 }
 
 int main(int argc, char **argv) {
-    // assert(1 == test((char*)"/data/workspace/dumi/x1-prover", 0));
+    assert(1 == test((char*)"/data/workspace/dumi/x1-prover", 0));
 
     // assert(1 == test_random());
 
-    assert(1 == test_lde_no_merkle_random());
+    // assert(1 == test_lde_no_merkle_random());
 
-    assert(1 == test_lde_merkle_random());
+    // assert(1 == test_lde_merkle_random());
 
     // assert(1 == test_ntt_partial_hash_random());
 

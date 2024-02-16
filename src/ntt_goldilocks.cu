@@ -172,7 +172,7 @@ __global__ void transpose(uint64_t* dst, uint64_t* src, uint32_t nblocks, uint32
         // last block
         for (uint32_t j = 0; j < ncols_last_block; j++)
         {
-            *ldst = src[(nblocks - 1) * nrows * ncols + i * ncols + j];
+            *ldst = src[(nblocks - 1) * nrows * ncols + i * ncols_last_block + j];
             ldst++;
         }
 }
@@ -1469,7 +1469,7 @@ void NTT_Goldilocks::LDE_MerkleTree_GPU_v3(Goldilocks::Element *dst, Goldilocks:
     CHECKCUDAERR(cudaMalloc(&gpu_inverse_twiddle_factors[gpu_id], ext_size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMalloc(&gpu_r_[gpu_id], ext_size * sizeof(uint64_t)));
 
-    int lg2 = log2(size);    
+    int lg2 = log2(size);
     init_twiddle_factors(gpu_forward_twiddle_factors[gpu_id], gpu_inverse_twiddle_factors[gpu_id], lg2);
     init_twiddle_factors(gpu_forward_twiddle_factors[gpu_id], gpu_inverse_twiddle_factors[gpu_id], lg2 + 1);
     init_r(gpu_r_[gpu_id], lg2);
@@ -2019,7 +2019,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
         // di is destination, dj is source
         for (uint64_t di = 0; di < nDevices; di++)
         {
-            for (uint64_t dj = 0; dj < nDevices; dj++)
+            for (uint64_t dj = 0; dj < nDevices - 1; dj++)
             {
                 CHECKCUDAERR(cudaMemcpyPeerAsync(gpu_a2[di] + dj * block_elem, di, gpu_a[dj] + di * block_elem, dj, block_size, gpu_stream[di]));
                 /*
@@ -2035,6 +2035,14 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
                 }
                 */
             }
+        }
+        // last block may have different size
+        uint64_t block_elem_last = nrows_per_gpu * ncols_last_gpu;
+        uint64_t block_size_last = block_elem_last * sizeof(uint64_t);
+        for (uint64_t di = 0; di < nDevices; di++)
+        {
+            uint64_t dj = nDevices - 1;
+            CHECKCUDAERR(cudaMemcpyPeerAsync(gpu_a2[di] + dj * block_elem, di, gpu_a[dj] + di * block_elem_last, dj, block_size_last, gpu_stream[di]));
         }
 #pragma omp parallel for num_threads(nDevices)
         for (uint32_t d = 0; d < nDevices; d++)
@@ -2066,6 +2074,8 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
         {
             CHECKCUDAERR(cudaSetDevice(d));
             CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[nDevices + d]));
+            CHECKCUDAERR(cudaFree(gpu_a2[d]));
+            CHECKCUDAERR(cudaMalloc(&gpu_a2[d], 4 * nrows_per_gpu * sizeof(uint64_t)));
         }
 #ifdef GPU_TIMING
         TimerStopAndLog(LDE_MerkleTree_MultiGPU_MerkleTree_Transpose);
@@ -2090,8 +2100,15 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
             for (u_int64_t ie = 0; ie < ext_size; ++ie)
             {
                 u_int64_t offset2 = ie * ncols + d * ncols_per_gpu;
-                std::memcpy(&dst[offset2], &(aux[d][ie * aux_ncols]), aux_ncols * sizeof(Goldilocks::Element));
+                // std::memcpy(&dst[offset2], &(aux[d][ie * aux_ncols]), aux_ncols * sizeof(Goldilocks::Element));
+                CHECKCUDAERR(cudaMemcpyAsync(&dst[offset2], &gpu_a[d][ie * aux_ncols], aux_ncols * sizeof(uint64_t), cudaMemcpyDeviceToHost, gpu_stream[d]));
             }
+        }
+        #pragma omp parallel for num_threads(nDevices)
+        for (uint32_t d = 0; d < nDevices; d++)
+        {
+            CHECKCUDAERR(cudaSetDevice(d));
+            CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
         }
 #ifdef GPU_TIMING
         TimerStopAndLog(LDE_MerkleTree_MultiGPU_CopyBackAfterNTT);
