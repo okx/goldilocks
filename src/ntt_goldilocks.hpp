@@ -176,18 +176,14 @@ public:
     return roots[idx << (s - domainPow)];
   }
   void extendPol(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, u_int64_t nblock = NUM_BLOCKS);
-#ifdef __USE_CUDA__
-#define DEFAULT_GPU 7
-#define TOTAL_GPU 1
-  void extendPol_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, uint64_t log_N_Extended, uint64_t log_N, uint64_t ncols) {
-    extendPol_temp(dst, src, log_N_Extended, log_N, ncols);
-  }
-  void NTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, bool transpose = false);
-  void INTT_cuda(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ncols = 1, Goldilocks::Element *buffer = NULL, bool transpose = false, bool extend = false);
-  void init_twiddle_factors_cuda(u_int32_t device_id, u_int32_t lg_n) {
-    init_twiddle_factors_temp(device_id, lg_n);
-  }
-#endif // __USE_CUDA__
 };
+
+#ifdef __USE_CUDA__
+#define TOTAL_GPU 8
+void extendPol_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, uint32_t log_N_Extended, uint32_t log_N, uint32_t ncols = 1);
+void NTT_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, u_int32_t lg_n, u_int32_t ncols = 1);
+void INTT_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, u_int32_t lg_n, u_int32_t ncols = 1, bool extend = false);
+void init_parameters_cuda(u_int32_t device_id, u_int32_t log_n);
+#endif // __USE_CUDA__
 
 #endif
