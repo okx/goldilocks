@@ -2897,9 +2897,9 @@ TEST(GOLDILOCKS_TEST, extendePol_cuda)
 
   NTT_Goldilocks ntt(FFT_SIZE);
   ntt.computeR(FFT_SIZE);
-  printf("init_parameters_cuda...\n");
+  u_int32_t deviceCount = get_device_count();
   #pragma omp parallel for schedule(static)
-  for (u_int32_t i = 0; i < TOTAL_GPU; i++) {
+  for (u_int32_t i = 0; i < deviceCount; i++) {
       init_parameters_cuda(i, LOG_FFT_SIZE);
   }
 

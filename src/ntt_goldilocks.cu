@@ -405,6 +405,13 @@ void init_parameters_cuda(u_int32_t device_id, u_int32_t lg_n) {
   init_r(lg_n);
 }
 
+u_int32_t get_device_count() {
+  int deviceCount;
+  cudaGetDeviceCount(&deviceCount);
+  printf("Detected %d CUDA Capable device(s).\n", deviceCount);
+  return deviceCount;
+}
+
 void extendPol_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, uint32_t log_N_Extended, uint32_t log_N, uint32_t ncols) {
 
   CHECKCUDAERR(cudaSetDevice(device_id));
@@ -485,7 +492,7 @@ int main() {
   CHECKCUDAERR(cudaSetDevice(0));
   uint32_t log_domain_size = 23;
   uint32_t domain_size = 1<<log_domain_size;
-  uint32_t ncols = 84;
+  uint32_t ncols = 168;
   uint64_t *a = (uint64_t *)malloc(2*domain_size * ncols * sizeof(uint64_t));
   uint64_t *b = (uint64_t *)malloc(2*domain_size * ncols * sizeof(uint64_t));
   init_input((Goldilocks::Element *)a, domain_size, ncols);

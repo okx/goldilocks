@@ -183,6 +183,7 @@ public:
 void extendPol_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, uint32_t log_N_Extended, uint32_t log_N, uint32_t ncols = 1);
 void NTT_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, u_int32_t lg_n, u_int32_t ncols = 1);
 void INTT_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, u_int32_t lg_n, u_int32_t ncols = 1, bool extend = false);
+u_int32_t get_device_count();
 void init_parameters_cuda(u_int32_t device_id, u_int32_t log_n);
 #endif // __USE_CUDA__
 
