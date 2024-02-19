@@ -347,7 +347,7 @@ void init_input(Goldilocks::Element *a, uint32_t domain_size, uint32_t ncols) {
   }
 }
 
-void NTT_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, u_int32_t log_n, u_int32_t ncols) {
+void NTT_cuda(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, uint32_t log_n, uint32_t ncols) {
 
   if (dst == NULL) {
     dst = src;
@@ -371,7 +371,7 @@ void NTT_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element
   cudaFree(d_data);
 }
 
-void INTT_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, u_int32_t log_n, u_int32_t ncols, bool extend) {
+void INTT_cuda(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, uint32_t log_n, uint32_t ncols, bool extend) {
 
   if (dst == NULL) {
     dst = src;
@@ -396,7 +396,7 @@ void INTT_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Elemen
   cudaFree(d_data);
 }
 
-void init_parameters_cuda(u_int32_t device_id, u_int32_t lg_n) {
+void init_parameters_cuda(uint32_t device_id, uint32_t lg_n) {
 
   CHECKCUDAERR(cudaSetDevice(device_id));
 
@@ -405,14 +405,18 @@ void init_parameters_cuda(u_int32_t device_id, u_int32_t lg_n) {
   init_r(lg_n);
 }
 
-u_int32_t get_device_count() {
+uint32_t get_device_count() {
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
   printf("Detected %d CUDA Capable device(s).\n", deviceCount);
   return deviceCount;
 }
 
-void extendPol_cuda(u_int32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, uint32_t log_N_Extended, uint32_t log_N, uint32_t ncols) {
+void extendPol_cuda(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, uint32_t log_N_Extended, uint32_t log_N, uint32_t ncols) {
+
+  if (dst == NULL) {
+    dst = src;
+  }
 
   CHECKCUDAERR(cudaSetDevice(device_id));
 
