@@ -179,6 +179,7 @@ int test(char* path, int testId) {
     uint64_t iparams[6] = {0};
     // uint64_t oparams[6] = {0};
     uint64_t ine, one;
+    uint64_t extension = 2;
     // Goldilocks::Element * idata = read_file(ifilename, &ine, iparams);
     if (read_file_v4(ifilename, &ine, iparams) == 0)
     {
@@ -192,12 +193,12 @@ int test(char* path, int testId) {
         printf("0 input elements. Return 1.\n\n");
         return 1;
     }
-    one = 2 * ine;
+    one = extension * ine;
     int fd;
     Goldilocks::Element * idata1 = map_file(ifilename, ine + 2, &fd);
     Goldilocks::Element * idata = idata1 + 2;
     printf("Number of input elements %lu\n", ine);
-    uint64_t tree_size = (4 * iparams[0] - 1) * 4;  // 4 * n -> n_ext
+    uint64_t tree_size = (2 * extension * iparams[0] - 1) * 4;  // 2n-1 but n is extended
     printf("Number of tree elements %lu\n", tree_size);
     Goldilocks::Element *tree1 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
     assert(tree1 != NULL);
@@ -208,7 +209,7 @@ int test(char* path, int testId) {
      Goldilocks::Element *out2 = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
     assert(out2 != NULL);
 
-    NTT_Goldilocks ntt(2 * iparams[0]);
+    NTT_Goldilocks ntt(extension * iparams[0]);
 #ifdef __USE_CUDA__
     ntt.setUseGPU(true);
 #endif
@@ -221,7 +222,7 @@ int test(char* path, int testId) {
     gettimeofday(&start, NULL);
     // ntt.extendPol(tmp, idata, 2*iparams[0], iparams[0], iparams[1], NULL, iparams[2], iparams[3]);
     // PoseidonGoldilocks::merkletree_avx(tree1, tmp, iparams[1], 2*iparams[0]);
-    ntt.LDE_MerkleTree_CPU(tree1, idata, iparams[0], 2 * iparams[0], iparams[1], out1);
+    ntt.LDE_MerkleTree_CPU(tree1, idata, iparams[0], extension * iparams[0], iparams[1], out1);
     gettimeofday(&end, NULL);
     uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("LDE + Merkle Tree on CPU time: %lu ms\n", t / 1000);
@@ -229,20 +230,22 @@ int test(char* path, int testId) {
     // memset(tmp, 0, 2 * ine * sizeof(Goldilocks::Element));
     ntt.setUseGPU(true);
     gettimeofday(&start, NULL);
+    // ntt.LDE_MerkleTree_MultiGPU_Init(iparams[0], extension * iparams[0], iparams[1]);
     // ntt.INTT(tmp, idata, iparams[0], iparams[1], NULL, 3, 1, true);
     // ntt.NTT_BatchGPU(tree2, tmp, 2*iparams[0], iparams[1], 80, NULL, 3, false, false, true);
     // ntt.LDE_MerkleTree_GPU_v3(tree2, idata, iparams[0], 2 * iparams[0], iparams[1]);
     if (iparams[1] > 100)
     {
-        ntt.LDE_MerkleTree_MultiGPU_v3(tree2, idata, iparams[0], 2 * iparams[0], iparams[1], out2);
+        ntt.LDE_MerkleTree_MultiGPU_v3(tree2, idata, iparams[0], extension * iparams[0], iparams[1], out2);
     }
     else
     {
-        ntt.LDE_MerkleTree_GPU_v3(tree2, idata, iparams[0], 2 * iparams[0], iparams[1], out2);
+        ntt.LDE_MerkleTree_GPU_v3(tree2, idata, iparams[0], extension * iparams[0], iparams[1], out2);
     }
     gettimeofday(&end, NULL);
     t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("LDE + Merkle Tree on GPU time: %lu ms\n", t / 1000);
+    // ntt.LDE_MerkleTree_MultiGPU_Free();
 
     // free(idata);
     assert(-1 != munmap(idata1, (ine + 2) * sizeof(Goldilocks::Element)));
