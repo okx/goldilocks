@@ -130,9 +130,11 @@ __global__ void br_ntt_group(gl64_t *data, gl64_t *twiddles, uint32_t i, uint32_
     uint32_t index1 = (group << i + 1) + offset;
     uint32_t index2 = index1 + half_group_size;
     gl64_t factor = twiddles[offset * (domain_size >> i + 1)];
-    gl64_t odd_sub = data[index2 * ncols + col] * factor;
-    data[index2 * ncols + col] = data[index1 * ncols + col] - odd_sub;
-    data[index1 * ncols + col] = data[index1 * ncols + col] + odd_sub;
+    gl64_t odd_sub = gl64_t((uint64_t)data[index2 * ncols + col]) * factor;
+    data[index2 * ncols + col] = gl64_t((uint64_t)data[index1 * ncols + col]) - odd_sub;
+    data[index1 * ncols + col] = gl64_t((uint64_t)data[index1 * ncols + col]) + odd_sub;
+    // DEGUG: assert(data[index2 * ncols + col] < 18446744069414584321ULL);
+    // DEBUG: assert(data[index1 * ncols + col] < 18446744069414584321ULL);
   }
 }
 
@@ -144,11 +146,12 @@ __global__ void intt_scale(gl64_t *data, gl64_t *r, uint32_t domain_size, uint32
   gl64_t factor = gl64_t(domain_size_inverse[log_domain_size]);
   if (extend)
   {
-    factor *= r[domain_size + j];
+    factor = factor * r[domain_size + j];
   }
   if (index < domain_size * ncols)
   {
-    data[index] = data[index] * factor;
+    data[index] = gl64_t((uint64_t)data[index]) * factor;
+    // DEBUG: assert(data[index] < 18446744069414584321ULL);
   }
 }
 
