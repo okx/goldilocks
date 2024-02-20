@@ -627,8 +627,6 @@ void NTT_Goldilocks::NTT_GPU_iters_onGPU(Goldilocks::Element *dst, u_int64_t siz
         u_int64_t batchSize = 1 << sInc;
         u_int64_t nBatches = size / batchSize;
 
-        printf("nBatched %lu\n", nBatches);
-
         ntt_iter_loop<<<ceil((nBatches) / (1.0 * TPB_V1)), TPB_V1, 0, gpu_stream[gpu_id]>>>(nBatches, gpu_roots[gpu_id], a, a2, gpu_powTwoInv[gpu_id], gpu_r_[gpu_id], batchSize, ncols, rs, re, rb, rm, this->s, s, sInc, maxBatchPow, domainPow, inverse, extend, size);
         CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
 
@@ -1801,7 +1799,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v2(Goldilocks::Element *dst, Goldil
         // di is destination, dj is source
         for (uint64_t di = 0; di < nDevices; di++)
         {
-            for (uint64_t dj = 0; dj < nDevices; dj++)
+            for (uint64_t dj = 0; dj < nDevices - 1; dj++)
             {
                 CHECKCUDAERR(cudaMemcpyPeerAsync(gpu_a2[di] + dj * block_elem, di, gpu_a[dj] + di * block_elem, dj, block_size, gpu_stream[di]));
                 /*
@@ -1817,6 +1815,14 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v2(Goldilocks::Element *dst, Goldil
                 }
                 */
             }
+        }
+        // last block may have different size
+        uint64_t block_elem_last = nrows_per_gpu * ncols_last_gpu;
+        uint64_t block_size_last = block_elem_last * sizeof(uint64_t);
+        for (uint64_t di = 0; di < nDevices; di++)
+        {
+            uint64_t dj = nDevices - 1;
+            CHECKCUDAERR(cudaMemcpyPeerAsync(gpu_a2[di] + dj * block_elem, di, gpu_a[dj] + di * block_elem_last, dj, block_size_last, gpu_stream[di]));
         }
 #pragma omp parallel for num_threads(nDevices)
         for (uint32_t d = 0; d < nDevices; d++)
@@ -1960,7 +1966,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
         uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
         if (buffer != NULL)
         {
-            aux[d] = buffer + d * ext_size * aux_ncols;
+            aux[d] = buffer + d * ext_size * ncols_per_gpu;
         }
         else
         {
