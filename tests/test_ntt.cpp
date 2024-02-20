@@ -113,13 +113,17 @@ void read_file_v3(char *fname, uint64_t* n_elem, uint64_t* params)
     fclose(f);
 }
 
-void read_file_v4(char *fname, uint64_t* n_elem, uint64_t* params)
+int read_file_v4(char *fname, uint64_t* n_elem, uint64_t* params)
 {
     FILE *f = fopen(fname, "rb");
-    assert(f != NULL);
+    if (!f)
+    {
+        return 0;
+    }
     assert(2 == fread(params, sizeof(uint64_t), 2, f));
     *n_elem = params[0] * params[1];
     fclose(f);
+    return 1;
 }
 
 Goldilocks::Element *map_file(char *fname, size_t total_elem, int *fd)
@@ -176,7 +180,11 @@ int test(char* path, int testId) {
     // uint64_t oparams[6] = {0};
     uint64_t ine, one;
     // Goldilocks::Element * idata = read_file(ifilename, &ine, iparams);
-    read_file_v4(ifilename, &ine, iparams);
+    if (read_file_v4(ifilename, &ine, iparams) == 0)
+    {
+        printf("File not found %s.\n\n", ifilename);
+        return 1;
+    }
     // iparams[1] = 640;
     ine = iparams[0] * iparams[1];
     if (ine == 0)
@@ -241,11 +249,13 @@ int test(char* path, int testId) {
     close(fd);
 
     // here we make sure data is in canonical form
+    /*
 #pragma omp parallel for
     for (size_t i = 0; i < ine; i++)
     {
         out2[i] = Goldilocks::fromU64(Goldilocks::toU64(out2[i]));
     }
+    */
 
     int ret = comp_output(out1, out2, one);
 

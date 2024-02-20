@@ -1,3 +1,4 @@
+// __USE_CUDA__ is the flag for enabling CUDA code. This file is used only when we compile for non-GPU usage.
 #ifndef __USE_CUDA__
 
 #include "ntt_goldilocks.hpp"
