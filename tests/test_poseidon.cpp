@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "../src/goldilocks_base_field.hpp"
 #include "../src/poseidon_goldilocks.hpp"
+#include "../src/ntt_goldilocks.hpp"
 
 TEST(GOLDILOCKS_TEST, avx_op)
 {
@@ -42,8 +43,42 @@ TEST(GOLDILOCKS_TEST, avx_op)
   for (uint32_t i = 0; i<N; i++) {
     printf("%lu\n", Goldilocks::toU64(a[i]));
   }
-
 }
+
+#define FFT_SIZE (1 << 23)
+#define BLOWUP_FACTOR 1
+#define NUM_COLUMNS 15
+
+#ifdef __USE_CUDA__
+TEST(GOLDILOCKS_TEST, x1)
+{
+  Goldilocks::Element *a = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+  Goldilocks::Element *b = (Goldilocks::Element *)malloc((FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+
+  NTT_Goldilocks ntt(FFT_SIZE);
+
+  for (uint i = 0; i < 2; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      Goldilocks::add(a[i * NUM_COLUMNS + j], Goldilocks::one(), Goldilocks::fromU64(j));
+    }
+  }
+
+  for (uint64_t i = 2; i < FFT_SIZE; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      a[i * NUM_COLUMNS + j] = a[NUM_COLUMNS * (i - 1) + j] + a[NUM_COLUMNS * (i - 2) + j];
+    }
+  }
+
+  ntt.LDE_MerkleTree_MultiGPU_v3(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS);
+
+  free(a);
+  free(b);
+}
+#endif
 
 int main(int argc, char **argv)
 {
