@@ -1,12 +1,13 @@
+#include <gtest/gtest.h>
 #include "../src/goldilocks_base_field.hpp"
 #include "../src/poseidon_goldilocks.hpp"
 
 TEST(GOLDILOCKS_TEST, avx_op)
 {
   Goldilocks::Element *a = (Goldilocks::Element *)malloc(3 * sizeof(Goldilocks::Element));
-  a[0] = 0X5587AD00B6DDF0CB;
-  a[1] = 0X279949E14530C250;
-  a[2] = 0x2F8E22C794677751;
+  a[0] = Goldilocks::fromU64(0X5587AD00B6DDF0CB);
+  a[1] = Goldilocks::fromU64(0X279949E14530C250);
+  a[2] = Goldilocks::fromU64(0x2F8E22C794677751);
 
   __m256i st0;
   Goldilocks::load_avx(st0, a);
