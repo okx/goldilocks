@@ -22,6 +22,14 @@ TEST(GOLDILOCKS_TEST, avx_op)
   for (uint32_t i = 0; i<3; i++) {
     printf("%llu\n", Goldilocks::toU64(a[i]));
   }
+
+  Goldilocks::square_avx(st0, st0);
+  Goldilocks::store_avx(a, st0);
+
+  for (uint32_t i = 0; i<3; i++) {
+    printf("%llu\n", Goldilocks::toU64(a[i]));
+  }
+
 }
 
 int main(int argc, char **argv)

@@ -93,6 +93,7 @@ tnttcpu: tests/test_ntt.cpp $(ALLSRCS)
 
 avxcpu: tests/test_ntt.cpp $(ALLSRCS)
 	$(CXX) tests/test_poseidon.cpp src/*.cpp -lgtest -lgmp -O3 -Wall -pthread -fopenmp -mavx2 -o $@
+	./avxcpu
 
 
 tnttgpu: tests/test_ntt.cpp $(ALLSRCS)
