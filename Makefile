@@ -91,7 +91,7 @@ tbtogpu: tests/test_merkle.cpp $(ALLSRCS)
 tnttcpu: tests/test_ntt.cpp $(ALLSRCS)
 	$(CXX) tests/test_ntt.cpp src/*.cpp -lgtest -lgmp -O3 -Wall -pthread -fopenmp -mavx2 -o $@
 
-avxcpu: tests/test_ntt.cpp $(ALLSRCS)
+avxcpu: tests/test_poseidon.cpp $(ALLSRCS)
 	$(CXX) tests/test_poseidon.cpp src/*.cpp -lgtest -lgmp -O3 -Wall -pthread -fopenmp -mavx2 -o $@
 	./avxcpu
 
@@ -103,7 +103,7 @@ runfull: tests/test_poseidon.cpp $(ALLSRCS)
 	$(NVCC) -D__USE_CUDA__ -Iutils/ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler -mavx2 -Xcompiler -O3 src/ntt_goldilocks.cu -arch=$(CUDA_ARCH) -dc --output-file ntt_goldilocks_gpu.o
 	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler -mavx2 src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) -O3 -dc --output-file poseidon_goldilocks_gpu.o
 	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -O3 -o $@ test_ntt.o timer.o goldilocks_base_field.o ntt_goldilocks_gpu.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o -lgtest -lgmp
-	./runfull --gtest_filter=GOLDILOCKS_TEST.x1
+	./runfull
 
 tnttgpu: tests/test_ntt.cpp $(ALLSRCS)
 	$(CXX) -D__USE_CUDA__ tests/test_ntt.cpp -O3 -pthread -fopenmp -mavx2 -c
