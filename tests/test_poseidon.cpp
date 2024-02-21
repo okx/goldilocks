@@ -4,7 +4,7 @@
 
 TEST(GOLDILOCKS_TEST, avx_op)
 {
-  const N = 4;
+  const uint32_t N = 4;
   Goldilocks::Element *a = (Goldilocks::Element *)malloc(N * sizeof(Goldilocks::Element));
   a[0] = Goldilocks::fromU64(0X5587AD00B6DDF0CB);
   a[1] = Goldilocks::fromU64(0X279949E14530C250);
