@@ -32,6 +32,17 @@ TEST(GOLDILOCKS_TEST, avx_op)
     printf("%lu\n", Goldilocks::toU64(a[i]));
   }
 
+  Goldilocks::Element *b = (Goldilocks::Element *)malloc(2 * N * sizeof(Goldilocks::Element));
+
+  std::memcpy(b, a, N * sizeof(Goldilocks::Element));
+  std::memcpy(b+N, a, N * sizeof(Goldilocks::Element));
+
+  PoseidonGoldilocks::linear_hash(a, b, N * 2);
+
+  for (uint32_t i = 0; i<N; i++) {
+    printf("%lu\n", Goldilocks::toU64(a[i]));
+  }
+
 }
 
 int main(int argc, char **argv)
