@@ -4,10 +4,12 @@
 
 TEST(GOLDILOCKS_TEST, avx_op)
 {
-  Goldilocks::Element *a = (Goldilocks::Element *)malloc(3 * sizeof(Goldilocks::Element));
+  const N = 4;
+  Goldilocks::Element *a = (Goldilocks::Element *)malloc(N * sizeof(Goldilocks::Element));
   a[0] = Goldilocks::fromU64(0X5587AD00B6DDF0CB);
   a[1] = Goldilocks::fromU64(0X279949E14530C250);
   a[2] = Goldilocks::fromU64(0x2F8E22C794677751);
+  a[3] = Goldilocks::fromU64(0X8EC2B67AFB6B87ED);
 
   __m256i st0;
   Goldilocks::load_avx(st0, a);
@@ -19,15 +21,15 @@ TEST(GOLDILOCKS_TEST, avx_op)
 
   Goldilocks::store_avx(a, st0);
 
-  for (uint32_t i = 0; i<3; i++) {
-    printf("%llu\n", Goldilocks::toU64(a[i]));
+  for (uint32_t i = 0; i<N; i++) {
+    printf("%lu\n", Goldilocks::toU64(a[i]));
   }
 
   Goldilocks::square_avx(st0, st0);
   Goldilocks::store_avx(a, st0);
 
-  for (uint32_t i = 0; i<3; i++) {
-    printf("%llu\n", Goldilocks::toU64(a[i]));
+  for (uint32_t i = 0; i<N; i++) {
+    printf("%lu\n", Goldilocks::toU64(a[i]));
   }
 
 }
