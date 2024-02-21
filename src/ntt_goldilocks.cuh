@@ -3,6 +3,10 @@
 #include <cuda_runtime.h>
 #include <sys/time.h>
 
+#ifdef GPU_TIMING
+#include "timer.hpp"
+#endif
+
 __device__ __constant__ uint64_t omegas[33] = {
     1,
     18446744069414584320ULL,
@@ -130,9 +134,11 @@ __global__ void br_ntt_group(gl64_t *data, gl64_t *twiddles, uint32_t i, uint32_
     uint32_t index1 = (group << i + 1) + offset;
     uint32_t index2 = index1 + half_group_size;
     gl64_t factor = twiddles[offset * (domain_size >> i + 1)];
-    gl64_t odd_sub = data[index2 * ncols + col] * factor;
-    data[index2 * ncols + col] = data[index1 * ncols + col] - odd_sub;
-    data[index1 * ncols + col] = data[index1 * ncols + col] + odd_sub;
+    gl64_t odd_sub = gl64_t((uint64_t)data[index2 * ncols + col]) * factor;
+    data[index2 * ncols + col] = gl64_t((uint64_t)data[index1 * ncols + col]) - odd_sub;
+    data[index1 * ncols + col] = gl64_t((uint64_t)data[index1 * ncols + col]) + odd_sub;
+    // DEGUG: assert(data[index2 * ncols + col] < 18446744069414584321ULL);
+    // DEBUG: assert(data[index1 * ncols + col] < 18446744069414584321ULL);
   }
 }
 
@@ -144,11 +150,12 @@ __global__ void intt_scale(gl64_t *data, gl64_t *r, uint32_t domain_size, uint32
   gl64_t factor = gl64_t(domain_size_inverse[log_domain_size]);
   if (extend)
   {
-    factor *= r[domain_size + j];
+    factor = factor * r[domain_size + j];
   }
   if (index < domain_size * ncols)
   {
-    data[index] = data[index] * factor;
+    data[index] = gl64_t((uint64_t)data[index]) * factor;
+    // DEBUG: assert(data[index] < 18446744069414584321ULL);
   }
 }
 
@@ -295,16 +302,15 @@ void ntt_cuda(cudaStream_t stream, gl64_t *data, gl64_t *r, gl64_t *fwd_twiddles
     gridDim = dim3(1);
   }
 
-  struct timeval start, end;
-  gettimeofday(&start, NULL);
+#ifdef GPU_TIMING
+  TimerStart(NTT_Core_ReversePermutation);
+#endif
   reverse_permutation<<<gridDim, blockDim, 0, stream>>>(data, log_domain_size, ncols);
-  CHECKCUDAERR(cudaGetLastError());
+  // CHECKCUDAERR(cudaGetLastError());
+#ifdef GPU_TIMING
   cudaStreamSynchronize(stream);
-  gettimeofday(&end, NULL);
-  long seconds = end.tv_sec - start.tv_sec;
-  long microseconds = end.tv_usec - start.tv_usec;
-  long elapsed = seconds * 1000 + microseconds / 1000;
-  printf("reverse_permutation elapsed: %ld ms\n", elapsed);
+  TimerStopAndLog(NTT_Core_ReversePermutation);
+#endif
 
 #ifdef __PRINT_LOG__
   uint64_t *log = (uint64_t *)malloc(MAX_LOG_ITEMS * sizeof(uint64_t));
@@ -319,37 +325,32 @@ void ntt_cuda(cudaStream_t stream, gl64_t *data, gl64_t *r, gl64_t *fwd_twiddles
   free(log);
 #endif
 
-  gettimeofday(&start, NULL);
-  // dim3 blockIdx = dim3(domain_size/2);
+  gl64_t *ptr_twiddles = fwd_twiddles;
   if (inverse)
   {
-    for (uint32_t i = 0; i < log_domain_size; i++)
-    {
-      br_ntt_group<<<domain_size / 2, ncols, 0, stream>>>(data, inv_twiddles, i, domain_size, ncols);
-    }
+    ptr_twiddles = inv_twiddles;
   }
-  else
+#ifdef GPU_TIMING
+  TimerStart(NTT_Core_BRNTTGroup);
+#endif
+  for (uint32_t i = 0; i < log_domain_size; i++)
   {
-    for (uint32_t i = 0; i < log_domain_size; i++)
-    {
-      br_ntt_group<<<domain_size / 2, ncols, 0, stream>>>(data, fwd_twiddles, i, domain_size, ncols);
-    }
+    br_ntt_group<<<domain_size / 2, ncols, 0, stream>>>(data, ptr_twiddles, i, domain_size, ncols);
   }
+#ifdef GPU_TIMING
   cudaStreamSynchronize(stream);
-  gettimeofday(&end, NULL);
-  seconds = end.tv_sec - start.tv_sec;
-  microseconds = end.tv_usec - start.tv_usec;
-  elapsed = seconds * 1000 + microseconds / 1000;
-  printf("br_ntt_group elapsed: %ld ms\n", elapsed);
+  TimerStopAndLog(NTT_Core_BRNTTGroup);
+#endif
+
   if (inverse)
   {
-    gettimeofday(&start, NULL);
+#ifdef GPU_TIMING
+    TimerStart(NTT_Core_INTTScale);
+#endif
     intt_scale<<<domain_size, ncols, 0, stream>>>(data, r, domain_size, log_domain_size, ncols, extend);
+#ifdef GPU_TIMING
     cudaStreamSynchronize(stream);
-    gettimeofday(&end, NULL);
-    seconds = end.tv_sec - start.tv_sec;
-    microseconds = end.tv_usec - start.tv_usec;
-    elapsed = seconds * 1000 + microseconds / 1000;
-    printf("intt_scale elapsed: %ld ms\n", elapsed);
+    TimerStopAndLog(NTT_Core_INTTScale);
+#endif
   }
 }

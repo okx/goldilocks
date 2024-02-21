@@ -122,7 +122,7 @@ void init_gpu_const(int nDevices = 0)
 
 __device__ void hash_full_result_seq(gl64_t *state, const gl64_t *input, const gl64_t *GPU_C_GL, const gl64_t *GPU_S_GL, const gl64_t *GPU_M_GL, const gl64_t *GPU_P_GL)
 {
-    mymemcpy((uint64_t*)state, (uint64_t*)input, SPONGE_WIDTH);    
+    mymemcpy((uint64_t*)state, (uint64_t*)input, SPONGE_WIDTH);
 
     add_(state, GPU_C_GL);
     for (int r = 0; r < HALF_N_FULL_ROUNDS - 1; r++)
@@ -172,9 +172,9 @@ __device__ void linear_hash_one(gl64_t *output, gl64_t *input, uint32_t size, in
         mymemcpy((uint64_t*)GPU_P_SM, GPU_P, 144);
     }
     __syncthreads();
-  
+
     gl64_t state[SPONGE_WIDTH];
-    
+
 
     if (size <= CAPACITY)
     {
@@ -199,7 +199,7 @@ __device__ void linear_hash_one(gl64_t *output, gl64_t *input, uint32_t size, in
         hash_full_result_seq(state, state, GPU_C_SM, GPU_S_SM, GPU_M_SM, GPU_P_SM);
         remaining -= n;
     }
-    mymemcpy((uint64_t*)output, (uint64_t*)state, CAPACITY);    
+    mymemcpy((uint64_t*)output, (uint64_t*)state, CAPACITY);
 }
 
 __device__ void linear_partial_hash_one(gl64_t *input, uint32_t size, gl64_t *state, int tid)
@@ -475,7 +475,7 @@ void merkletree_cuda_multi_gpu(Goldilocks::Element *tree, uint64_t *dst_gpu_tree
             CHECKCUDAERR(cudaFree(gpu_tree[d]));
         }
 #ifdef GPU_TIMING
-        TimerStopAndLog(merkletree_cuda_multi_gpu_cleanup);        
+        TimerStopAndLog(merkletree_cuda_multi_gpu_cleanup);
 #endif
     }
 
@@ -485,9 +485,9 @@ void merkletree_cuda_multi_gpu(Goldilocks::Element *tree, uint64_t *dst_gpu_tree
 }
 
 void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full(Goldilocks::Element *tree, uint64_t** gpu_inputs, uint64_t** gpu_trees, void* v_gpu_streams, uint64_t num_cols, uint64_t num_rows, uint64_t num_rows_device, uint32_t const ngpu, uint64_t dim)
-{   
+{
     cudaStream_t* gpu_streams = (cudaStream_t*)v_gpu_streams;
-    uint64_t numElementsTree = MerklehashGoldilocks::getTreeNumElements(num_rows);    
+    uint64_t numElementsTree = MerklehashGoldilocks::getTreeNumElements(num_rows);
     uint64_t numElementsTreeDevice = num_rows_device * CAPACITY;
 
     uint64_t* gpu_final_tree;
@@ -531,8 +531,8 @@ void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full(Goldilocks::Element *tre
             CHECKCUDAERR(cudaStreamSynchronize(gpu_streams[d]));
         }
 #ifdef GPU_TIMING
-        TimerStopAndLog(merkletree_cuda_multi_gpu_cleanup);        
-#endif    
+        TimerStopAndLog(merkletree_cuda_multi_gpu_cleanup);
+#endif
 
     // Build the merkle tree
     CHECKCUDAERR(cudaSetDevice(0));
@@ -568,8 +568,8 @@ void PoseidonGoldilocks::merkletree_cuda(Goldilocks::Element *tree, Goldilocks::
         return;
     }
 
-    // is the input < 2 MB -> run on CPU
-    if (num_rows * num_cols * dim <= 262144)
+    // is the input < 2 GB -> run on CPU
+    if (num_rows * num_cols * dim <= (1ul << 32))
     {
 #ifdef __AVX512__
         PoseidonGoldilocks::merkletree_avx512(tree, input, num_cols, num_rows, nThreads, dim);

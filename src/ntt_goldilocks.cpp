@@ -1,3 +1,6 @@
+// __USE_CUDA__ is the flag for enabling CUDA code. This file is used only when we compile for non-GPU usage.
+#ifndef __USE_CUDA__
+
 #include "ntt_goldilocks.hpp"
 
 static inline u_int64_t BR(u_int64_t x, u_int64_t domainPow)
@@ -323,6 +326,41 @@ void NTT_Goldilocks::INTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_
     NTT(dst_, src, size, ncols, buffer, nphase, nblock, true, extend);
 }
 
+// NOTE: enable the code below to save the inputs to extendPol()
+/*
+static int fcnt = 0;    // file counter
+
+void write_binary_file(char* prefix, Goldilocks::Element* data, uint64_t nrows, uint64_t ncols) {
+    char fname[32];
+    sprintf(fname, "%s-%d.bin", prefix, fcnt);
+    fcnt++;
+    FILE *f = fopen(fname, "wb");
+
+    assert(1 == fwrite(&nrows, sizeof(uint64_t), 1, f));
+    assert(1 == fwrite(&ncols, sizeof(uint64_t), 1, f));
+
+    size_t nelements = nrows * ncols;
+    const size_t write_size = (1 << 22);
+    const size_t write_elements = write_size / sizeof(Goldilocks::Element);
+    size_t idx = 0;
+    while (nelements >= write_elements) {
+        size_t n = fwrite(data + idx, sizeof(Goldilocks::Element), write_elements, f);
+        assert(n == write_elements);
+        idx += write_elements;
+        nelements -= write_elements;
+    }
+    if (nelements > 0) {
+        size_t n = fwrite(data + idx, sizeof(Goldilocks::Element), nelements, f);
+        assert(n == nelements);
+    }
+
+    fclose(f);
+}
+
+void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock)
+{
+    write_binary_file("pols", input, N, ncols);
+*/
 void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock)
 {
     NTT_Goldilocks ntt_extension(N_Extended, nThreads, N_Extended / N);
@@ -350,3 +388,5 @@ void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element 
         free(tmp);
     }
 }
+
+#endif // __USE_CUDA__
