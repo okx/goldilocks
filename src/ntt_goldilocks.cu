@@ -11,8 +11,6 @@
 gl64_t *gpu_roots[MAX_GPUS];
 gl64_t *gpu_a[MAX_GPUS];
 gl64_t *gpu_a2[MAX_GPUS];
-// TODO - remove gpu_powTwoInv
-gl64_t *gpu_powTwoInv[MAX_GPUS];
 gl64_t *gpu_forward_twiddle_factors[MAX_GPUS];
 gl64_t *gpu_inverse_twiddle_factors[MAX_GPUS];
 gl64_t *gpu_r_[MAX_GPUS];
@@ -52,7 +50,7 @@ __host__ __device__ __forceinline__ int intt_idx(int i, int N)
     return (N - i) * (i != 0);
 }
 
-__global__ void ntt_iter_loop(uint32_t nBatches, gl64_t *roots, gl64_t *a, gl64_t *a2, gl64_t *powTwoInv, gl64_t *r_,
+__global__ void ntt_iter_loop(uint32_t nBatches, gl64_t *roots, gl64_t *a, gl64_t *a2, gl64_t *r_,
                               uint64_t batchSize, uint64_t ncols, uint64_t rs, uint64_t re, uint64_t rb, uint64_t rm,
                               uint32_t super_s, uint32_t s, uint32_t sInc, uint32_t maxBatchPow, uint32_t domainPow,
                               uint32_t inverse, uint32_t extend, uint32_t size)
@@ -118,23 +116,6 @@ __global__ void ntt_iter_loop(uint32_t nBatches, gl64_t *roots, gl64_t *a, gl64_
                     a2[offset_dstY + k] = a[offset_src + k] * r_[dsty];
                 }
             }
-        }
-        else
-        {
-            // this should not happen
-            assert(0);
-            /*
-            for (uint32_t x = 0; x < batchSize; x++)
-            {
-                u_int64_t dsty = intt_idx((x * nBatches + b), size);
-                u_int64_t offset_dstY = dsty * ncols;
-                u_int64_t offset_src = (b * batchSize + x) * ncols;
-                for (uint64_t k = 0; k < ncols; k++)
-                {
-                    a2[offset_dstY + k] = a[offset_src + k] * powTwoInv[domainPow];
-                }
-            }
-            */
         }
     }
 }
@@ -539,7 +520,7 @@ void NTT_Goldilocks::NTT_GPU_iters(Goldilocks::Element *dst, Goldilocks::Element
         u_int64_t batchSize = 1 << sInc;
         u_int64_t nBatches = size / batchSize;
 
-        ntt_iter_loop<<<ceil((nBatches) / (1.0 * TPB_V1)), TPB_V1, 0, gpu_stream[gpu_id]>>>(nBatches, gpu_roots[gpu_id], gpu_a[gpu_id], gpu_a2[gpu_id], gpu_powTwoInv[gpu_id], gpu_r_[gpu_id], batchSize, ncols, rs, re, rb, rm, this->s, s, sInc, maxBatchPow, domainPow, inverse, extend, size);
+        ntt_iter_loop<<<ceil((nBatches) / (1.0 * TPB_V1)), TPB_V1, 0, gpu_stream[gpu_id]>>>(nBatches, gpu_roots[gpu_id], gpu_a[gpu_id], gpu_a2[gpu_id], gpu_r_[gpu_id], batchSize, ncols, rs, re, rb, rm, this->s, s, sInc, maxBatchPow, domainPow, inverse, extend, size);
         CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
 
         gl64_t *tmpg = gpu_a2[gpu_id];
@@ -627,7 +608,7 @@ void NTT_Goldilocks::NTT_GPU_iters_onGPU(Goldilocks::Element *dst, u_int64_t siz
         u_int64_t batchSize = 1 << sInc;
         u_int64_t nBatches = size / batchSize;
 
-        ntt_iter_loop<<<ceil((nBatches) / (1.0 * TPB_V1)), TPB_V1, 0, gpu_stream[gpu_id]>>>(nBatches, gpu_roots[gpu_id], a, a2, gpu_powTwoInv[gpu_id], gpu_r_[gpu_id], batchSize, ncols, rs, re, rb, rm, this->s, s, sInc, maxBatchPow, domainPow, inverse, extend, size);
+        ntt_iter_loop<<<ceil((nBatches) / (1.0 * TPB_V1)), TPB_V1, 0, gpu_stream[gpu_id]>>>(nBatches, gpu_roots[gpu_id], a, a2, gpu_r_[gpu_id], batchSize, ncols, rs, re, rb, rm, this->s, s, sInc, maxBatchPow, domainPow, inverse, extend, size);
         CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
 
         tmp = a2;
@@ -740,7 +721,7 @@ void NTT_Goldilocks::NTT_MultiGPU_iters(Goldilocks::Element *dst, Goldilocks::El
         u_int64_t batchSize = 1 << sInc;
         u_int64_t nBatches = size / batchSize;
 
-        ntt_iter_loop<<<ceil((nBatches) / (1.0 * TPB_V1)), TPB_V1, 0, gpu_stream[gpu_id]>>>(nBatches, gpu_roots[gpu_id], gpu_a[gpu_id], gpu_a2[gpu_id], gpu_powTwoInv[gpu_id], gpu_r_[gpu_id], batchSize, ncols, rs, re, rb, rm, this->s, s, sInc, maxBatchPow, domainPow, inverse, extend, size);
+        ntt_iter_loop<<<ceil((nBatches) / (1.0 * TPB_V1)), TPB_V1, 0, gpu_stream[gpu_id]>>>(nBatches, gpu_roots[gpu_id], gpu_a[gpu_id], gpu_a2[gpu_id], gpu_r_[gpu_id], batchSize, ncols, rs, re, rb, rm, this->s, s, sInc, maxBatchPow, domainPow, inverse, extend, size);
         CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
 
         gl64_t *tmpg = gpu_a2[gpu_id];
@@ -865,8 +846,7 @@ void NTT_Goldilocks::NTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src,
     int gpu_id = 0;
     CHECKCUDAERR(cudaSetDevice(gpu_id));
     CHECKCUDAERR(cudaStreamCreate(gpu_stream + gpu_id));
-    CHECKCUDAERR(cudaMalloc(&gpu_roots[gpu_id], nRoots * sizeof(uint64_t)));      // 64M
-    CHECKCUDAERR(cudaMalloc(&gpu_powTwoInv[gpu_id], (s + 1) * sizeof(uint64_t))); // small
+    CHECKCUDAERR(cudaMalloc(&gpu_roots[gpu_id], nRoots * sizeof(uint64_t)));
     if (extend)
     {
         CHECKCUDAERR(cudaMalloc(&gpu_r_[gpu_id], size * sizeof(uint64_t))); // 64M
@@ -875,7 +855,6 @@ void NTT_Goldilocks::NTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src,
     CHECKCUDAERR(cudaMalloc(&gpu_a[gpu_id], aux_size * sizeof(uint64_t)));  // 42G
     CHECKCUDAERR(cudaMalloc(&gpu_a2[gpu_id], aux_size * sizeof(uint64_t))); // 42G
     CHECKCUDAERR(cudaMemcpyAsync(gpu_roots[gpu_id], (uint64_t *)roots, nRoots * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
-    CHECKCUDAERR(cudaMemcpyAsync(gpu_powTwoInv[gpu_id], (uint64_t *)powTwoInv, (s + 1) * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
     CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
 
 #ifdef GPU_TIMING
@@ -903,7 +882,6 @@ void NTT_Goldilocks::NTT_GPU(Goldilocks::Element *dst, Goldilocks::Element *src,
     CHECKCUDAERR(cudaFree(gpu_roots[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_a[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_a2[gpu_id]));
-    CHECKCUDAERR(cudaFree(gpu_powTwoInv[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_r_[gpu_id]));
 }
 
@@ -945,17 +923,15 @@ void NTT_Goldilocks::NTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element 
     {
         CHECKCUDAERR(cudaSetDevice(d));
         CHECKCUDAERR(cudaStreamCreate(gpu_stream + d));
-        CHECKCUDAERR(cudaMalloc(&gpu_roots[d], nRoots * sizeof(uint64_t)));      // 64M
-        CHECKCUDAERR(cudaMalloc(&gpu_powTwoInv[d], (s + 1) * sizeof(uint64_t))); // small
+        CHECKCUDAERR(cudaMalloc(&gpu_roots[d], nRoots * sizeof(uint64_t)));
         if (extend)
         {
-            CHECKCUDAERR(cudaMalloc(&gpu_r_[d], size * sizeof(uint64_t))); // 64M
+            CHECKCUDAERR(cudaMalloc(&gpu_r_[d], size * sizeof(uint64_t)));
             CHECKCUDAERR(cudaMemcpyAsync(gpu_r_[d], (uint64_t *)r_, size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[d]));
         }
-        CHECKCUDAERR(cudaMalloc(&gpu_a[d], aux_size * sizeof(uint64_t)));  // 42G
-        CHECKCUDAERR(cudaMalloc(&gpu_a2[d], aux_size * sizeof(uint64_t))); // 42G
+        CHECKCUDAERR(cudaMalloc(&gpu_a[d], aux_size * sizeof(uint64_t)));
+        CHECKCUDAERR(cudaMalloc(&gpu_a2[d], aux_size * sizeof(uint64_t)));
         CHECKCUDAERR(cudaMemcpyAsync(gpu_roots[d], (uint64_t *)roots, nRoots * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[d]));
-        CHECKCUDAERR(cudaMemcpyAsync(gpu_powTwoInv[d], (uint64_t *)powTwoInv, (s + 1) * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[d]));
     }
 
 #pragma omp parallel for num_threads(nDevices)
@@ -992,7 +968,6 @@ void NTT_Goldilocks::NTT_MultiGPU(Goldilocks::Element *dst, Goldilocks::Element 
         CHECKCUDAERR(cudaFree(gpu_roots[d]));
         CHECKCUDAERR(cudaFree(gpu_a[d]));
         CHECKCUDAERR(cudaFree(gpu_a2[d]));
-        CHECKCUDAERR(cudaFree(gpu_powTwoInv[d]));
         CHECKCUDAERR(cudaFree(gpu_r_[d]));
         free(aux[d]);
         free(dst_[d]);
@@ -1036,7 +1011,6 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     CHECKCUDAERR(cudaSetDevice(gpu_id));
     CHECKCUDAERR(cudaStreamCreate(gpu_stream + gpu_id));
     CHECKCUDAERR(cudaMalloc(&gpu_roots[gpu_id], nRoots * sizeof(uint64_t)));
-    CHECKCUDAERR(cudaMalloc(&gpu_powTwoInv[gpu_id], (s + 1) * sizeof(uint64_t)));
     if (extend)
     {
         CHECKCUDAERR(cudaMalloc(&gpu_r_[gpu_id], size * sizeof(uint64_t)));
@@ -1051,7 +1025,6 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     CHECKCUDAERR(cudaMalloc(&gpu_a[gpu_id], aux_size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMalloc(&gpu_a2[gpu_id], aux_size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMemcpyAsync(gpu_roots[gpu_id], (uint64_t *)roots, nRoots * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
-    CHECKCUDAERR(cudaMemcpyAsync(gpu_powTwoInv[gpu_id], (uint64_t *)powTwoInv, (s + 1) * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
 
 #ifdef GPU_TIMING
     CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[gpu_id]));
@@ -1114,7 +1087,6 @@ void NTT_Goldilocks::NTT_BatchGPU(Goldilocks::Element *dst, Goldilocks::Element 
     CHECKCUDAERR(cudaFree(gpu_roots[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_a[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_a2[gpu_id]));
-    CHECKCUDAERR(cudaFree(gpu_powTwoInv[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_r_[gpu_id]));
     if (buildMerkleTree)
     {
@@ -1159,7 +1131,6 @@ void NTT_Goldilocks::LDE_MerkleTree_BatchGPU(Goldilocks::Element *dst, Goldilock
     CHECKCUDAERR(cudaSetDevice(gpu_id));
     CHECKCUDAERR(cudaStreamCreate(gpu_stream + gpu_id));
     CHECKCUDAERR(cudaMalloc(&gpu_roots[gpu_id], nRoots * sizeof(uint64_t)));
-    CHECKCUDAERR(cudaMalloc(&gpu_powTwoInv[gpu_id], (s + 1) * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMalloc(&gpu_r_[gpu_id], size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMemcpyAsync(gpu_r_[gpu_id], (uint64_t *)r_, size * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
 
@@ -1170,7 +1141,6 @@ void NTT_Goldilocks::LDE_MerkleTree_BatchGPU(Goldilocks::Element *dst, Goldilock
     CHECKCUDAERR(cudaMalloc(&gpu_a[gpu_id], aux_size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMalloc(&gpu_a2[gpu_id], aux_size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMemcpyAsync(gpu_roots[gpu_id], (uint64_t *)roots, nRoots * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
-    CHECKCUDAERR(cudaMemcpyAsync(gpu_powTwoInv[gpu_id], (uint64_t *)powTwoInv, (s + 1) * sizeof(uint64_t), cudaMemcpyHostToDevice, gpu_stream[gpu_id]));
 
 #ifdef GPU_TIMING
     TimerStart(LDE_MerkleTree_BatchGPU_AllBatches);
@@ -1234,7 +1204,6 @@ void NTT_Goldilocks::LDE_MerkleTree_BatchGPU(Goldilocks::Element *dst, Goldilock
     CHECKCUDAERR(cudaFree(gpu_roots[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_a[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_a2[gpu_id]));
-    CHECKCUDAERR(cudaFree(gpu_powTwoInv[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_r_[gpu_id]));
     if (buildMerkleTree)
     {
@@ -1380,8 +1349,7 @@ void NTT_Goldilocks::LDE_MerkleTree_GPU(Goldilocks::Element *dst, Goldilocks::El
     CHECKCUDAERR(cudaSetDevice(gpu_id));
     CHECKCUDAERR(cudaStreamCreate(&gpu_stream[gpu_id]));
     CHECKCUDAERR(cudaMalloc(&gpu_roots[gpu_id], nRoots * sizeof(uint64_t)));
-    CHECKCUDAERR(cudaMalloc(&gpu_powTwoInv[gpu_id], (s + 1) * sizeof(uint64_t)));
-    CHECKCUDAERR(cudaMalloc(&gpu_r_[gpu_id], size * sizeof(uint64_t))); // 64M
+    CHECKCUDAERR(cudaMalloc(&gpu_r_[gpu_id], size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMalloc(&gpu_a[gpu_id], aux_size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMalloc(&gpu_a2[gpu_id], aux_size * sizeof(uint64_t)));
 
@@ -1391,7 +1359,6 @@ void NTT_Goldilocks::LDE_MerkleTree_GPU(Goldilocks::Element *dst, Goldilocks::El
 #endif
 
     CHECKCUDAERR(cudaMemcpyAsync(gpu_roots[gpu_id], (uint64_t *)roots, nRoots * sizeof(uint64_t), cudaMemcpyHostToDevice));
-    CHECKCUDAERR(cudaMemcpyAsync(gpu_powTwoInv[gpu_id], (uint64_t *)powTwoInv, (s + 1) * sizeof(uint64_t), cudaMemcpyHostToDevice));
     CHECKCUDAERR(cudaMemcpyAsync(gpu_r_[gpu_id], (uint64_t *)r_, size * sizeof(uint64_t), cudaMemcpyHostToDevice));
     CHECKCUDAERR(cudaDeviceSynchronize());
 
@@ -1439,7 +1406,6 @@ void NTT_Goldilocks::LDE_MerkleTree_GPU(Goldilocks::Element *dst, Goldilocks::El
     CHECKCUDAERR(cudaFree(gpu_roots[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_a[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_a2[gpu_id]));
-    CHECKCUDAERR(cudaFree(gpu_powTwoInv[gpu_id]));
     CHECKCUDAERR(cudaFree(gpu_r_[gpu_id]));
     free(aux);
     if (buildMerkleTree)
