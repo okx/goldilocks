@@ -95,7 +95,7 @@ avxcpu: tests/test_poseidon.cpp $(ALLSRCS)
 	$(CXX) tests/test_poseidon.cpp src/*.cpp -lgtest -lgmp -O3 -Wall -pthread -fopenmp -mavx2 -o $@
 	./avxcpu
 
-runfull: tests/test_poseidon.cpp $(ALLSRCS)
+fullgpu: tests/test_poseidon.cpp $(ALLSRCS)
 	$(CXX) -D__USE_CUDA__ tests/test_poseidon.cpp -O3 -pthread -fopenmp -mavx2 -c
 	$(CXX) src/goldilocks_base_field.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_base_field.o
 	$(CXX) utils/timer.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o timer.o
@@ -104,6 +104,9 @@ runfull: tests/test_poseidon.cpp $(ALLSRCS)
 	$(NVCC) -D__USE_CUDA__ -DGPU_TIMING -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler -mavx2 src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) -O3 -dc --output-file poseidon_goldilocks_gpu.o
 	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -O3 -o $@ test_poseidon.o timer.o goldilocks_base_field.o ntt_goldilocks_gpu.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o -lgtest -lgmp
 	./runfull --gtest_filter=GOLDILOCKS_TEST.full
+
+runfullgpu: fullgpu
+	CUDA_VISIBLE_DEVICES=0 ./runfull --gtest_filter=GOLDILOCKS_TEST.full
 
 tnttgpu: tests/test_ntt.cpp $(ALLSRCS)
 	$(CXX) -D__USE_CUDA__ tests/test_ntt.cpp -O3 -pthread -fopenmp -mavx2 -c
