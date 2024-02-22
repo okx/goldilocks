@@ -2,6 +2,7 @@
 #include "../src/goldilocks_base_field.hpp"
 #include "../src/poseidon_goldilocks.hpp"
 #include "../src/ntt_goldilocks.hpp"
+#include "../utils/timer.hpp"
 
 TEST(GOLDILOCKS_TEST, avx_op)
 {
@@ -73,7 +74,9 @@ TEST(GOLDILOCKS_TEST, full)
     }
   }
 
+  TimerStart(LDE_MerkleTree_MultiGPU_v3);
   ntt.LDE_MerkleTree_MultiGPU_v3(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS);
+  TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
 
   free(a);
   free(b);
