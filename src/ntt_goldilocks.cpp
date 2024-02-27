@@ -327,7 +327,7 @@ void NTT_Goldilocks::INTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_
 }
 
 // NOTE: enable the code below to save the inputs to extendPol()
-#ifdef 0
+#if 0
 static int fcnt = 0;    // file counter
 
 void write_binary_file(char* prefix, Goldilocks::Element* data, uint64_t nrows, uint64_t ncols) {
