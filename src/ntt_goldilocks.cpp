@@ -327,7 +327,7 @@ void NTT_Goldilocks::INTT(Goldilocks::Element *dst, Goldilocks::Element *src, u_
 }
 
 // NOTE: enable the code below to save the inputs to extendPol()
-/*
+#ifdef 0
 static int fcnt = 0;    // file counter
 
 void write_binary_file(char* prefix, Goldilocks::Element* data, uint64_t nrows, uint64_t ncols) {
@@ -360,9 +360,11 @@ void write_binary_file(char* prefix, Goldilocks::Element* data, uint64_t nrows, 
 void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock)
 {
     write_binary_file("pols", input, N, ncols);
-*/
+#else
 void NTT_Goldilocks::extendPol(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t N_Extended, uint64_t N, uint64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, u_int64_t nblock)
 {
+#endif  // #ifdef 0
+
     NTT_Goldilocks ntt_extension(N_Extended, nThreads, N_Extended / N);
 
     Goldilocks::Element *tmp = NULL;

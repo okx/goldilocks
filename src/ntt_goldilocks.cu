@@ -17,7 +17,7 @@ gl64_t *gpu_r_[MAX_GPUS];
 cudaStream_t gpu_stream[MAX_GPUS];
 gl64_t *gpu_poseidon_state[MAX_GPUS];
 
-#define GPU_TIMING
+// #define GPU_TIMING
 // #define GPU_TIMING_2
 #ifdef GPU_TIMING
 #include "timer.hpp"

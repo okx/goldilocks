@@ -1,4 +1,5 @@
 $(shell ./configure.sh)
+$(shell sleep 2)
 include CudaArch.mk
 
 TARGET_EXEC := example
