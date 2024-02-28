@@ -96,11 +96,13 @@ avxcpu: tests/test_poseidon.cpp $(ALLSRCS)
 	./avxcpu
 
 CXXFLAGS := -fPIC -O3 -Wall -pthread -fopenmp -mavx2
+AVXFLAG := -mavx2
 # Verify if AVX-512 is supported
 AVX512_SUPPORTED := $(shell cat /proc/cpuinfo | grep -E 'avx512' -m 1)
 
 ifneq ($(AVX512_SUPPORTED),)
 	CXXFLAGS += -mavx512f -D__AVX512__
+	AVXFLAG += -mavx512f -D__AVX512__
 endif
 
 fullgpu: tests/test_poseidon.cpp $(ALLSRCS)
@@ -108,8 +110,8 @@ fullgpu: tests/test_poseidon.cpp $(ALLSRCS)
 	$(CXX) src/goldilocks_base_field.cpp $(CXXFLAGS) -c -o goldilocks_base_field.o
 	$(CXX) utils/timer.cpp $(CXXFLAGS) -c -o timer.o
 	$(CXX) -D__USE_CUDA__ src/poseidon_goldilocks.cpp $(CXXFLAGS) -c -o poseidon_goldilocks.o
-	$(NVCC) -D__USE_CUDA__ -DGPU_TIMING -Iutils/ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler -mavx2 -Xcompiler -O3 src/ntt_goldilocks.cu -arch=$(CUDA_ARCH) -dc --output-file ntt_goldilocks_gpu.o
-	$(NVCC) -D__USE_CUDA__ -DGPU_TIMING -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler -mavx2 src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) -O3 -dc --output-file poseidon_goldilocks_gpu.o
+	$(NVCC) -D__USE_CUDA__ -DGPU_TIMING -Iutils/ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler $(AVXFLAG) -Xcompiler -O3 src/ntt_goldilocks.cu -arch=$(CUDA_ARCH) -dc --output-file ntt_goldilocks_gpu.o
+	$(NVCC) -D__USE_CUDA__ -DGPU_TIMING -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler $(AVXFLAG) src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) -O3 -dc --output-file poseidon_goldilocks_gpu.o
 	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -O3 -o $@ test_poseidon.o timer.o goldilocks_base_field.o ntt_goldilocks_gpu.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o -lgtest -lgmp
 
 runfullgpu: fullgpu
