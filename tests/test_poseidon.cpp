@@ -48,7 +48,7 @@ TEST(GOLDILOCKS_TEST, avx_op)
 
 #define FFT_SIZE (1 << 23)
 #define BLOWUP_FACTOR 1
-#define NUM_COLUMNS 84
+#define NUM_COLUMNS 669
 
 #ifdef __USE_CUDA__
 TEST(GOLDILOCKS_TEST, full)
@@ -77,6 +77,37 @@ TEST(GOLDILOCKS_TEST, full)
   TimerStart(LDE_MerkleTree_MultiGPU_v3);
   ntt.LDE_MerkleTree_MultiGPU_v3(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS);
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
+
+  free(a);
+  free(b);
+}
+#else
+TEST(GOLDILOCKS_TEST, full)
+{
+  Goldilocks::Element *a = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+  Goldilocks::Element *b = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+
+  NTT_Goldilocks ntt(FFT_SIZE);
+
+  for (uint i = 0; i < 2; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      Goldilocks::add(a[i * NUM_COLUMNS + j], Goldilocks::one(), Goldilocks::fromU64(j));
+    }
+  }
+
+  for (uint64_t i = 2; i < FFT_SIZE; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      a[i * NUM_COLUMNS + j] = a[NUM_COLUMNS * (i - 1) + j] + a[NUM_COLUMNS * (i - 2) + j];
+    }
+  }
+
+  TimerStart(LDE_MerkleTree_CPU);
+  ntt.LDE_MerkleTree_CPU(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS);
+  TimerStopAndLog(LDE_MerkleTree_CPU);
 
   free(a);
   free(b);

@@ -105,7 +105,13 @@ fullgpu: tests/test_poseidon.cpp $(ALLSRCS)
 	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -O3 -o $@ test_poseidon.o timer.o goldilocks_base_field.o ntt_goldilocks_gpu.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o -lgtest -lgmp
 
 runfullgpu: fullgpu
-	CUDA_VISIBLE_DEVICES=0 ./fullgpu --gtest_filter=GOLDILOCKS_TEST.full
+	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full
+
+fullcpu: tests/test_poseidon.cpp $(ALLSRCS)
+	$(CXX) tests/test_poseidon.cpp src/*.cpp -lgtest -lgmp -O3 -Wall -pthread -fopenmp -mavx2 -o $@
+
+runfullcpu: fullcpu
+	./fullcpu --gtest_filter=GOLDILOCKS_TEST.full
 
 tnttgpu: tests/test_ntt.cpp $(ALLSRCS)
 	$(CXX) -D__USE_CUDA__ tests/test_ntt.cpp -O3 -pthread -fopenmp -mavx2 -c
