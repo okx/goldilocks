@@ -107,11 +107,8 @@ fullgpu: tests/test_poseidon.cpp $(ALLSRCS)
 runfullgpu: fullgpu
 	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full
 
-fullcpu: tests/test_poseidon.cpp $(ALLSRCS)
-	$(CXX) tests/test_poseidon.cpp src/*.cpp -lgtest -lgmp -O3 -Wall -pthread -fopenmp -mavx2 -o $@
-
-runfullcpu: fullcpu
-	./fullcpu --gtest_filter=GOLDILOCKS_TEST.full
+runfullcpu: fullgpu
+	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full_cpu
 
 tnttgpu: tests/test_ntt.cpp $(ALLSRCS)
 	$(CXX) -D__USE_CUDA__ tests/test_ntt.cpp -O3 -pthread -fopenmp -mavx2 -c

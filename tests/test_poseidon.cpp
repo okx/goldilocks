@@ -81,8 +81,8 @@ TEST(GOLDILOCKS_TEST, full)
   free(a);
   free(b);
 }
-#else
-TEST(GOLDILOCKS_TEST, full)
+
+TEST(GOLDILOCKS_TEST, full_cpu)
 {
   Goldilocks::Element *a = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
   Goldilocks::Element *b = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
