@@ -1313,7 +1313,11 @@ void NTT_Goldilocks::LDE_MerkleTree_CPU(Goldilocks::Element *dst, Goldilocks::El
             toFree = true;
         }
         extendPol(buffer, src, ext_size, size, ncols, NULL, nphase, 1);
+#ifdef __AVX512__
+        PoseidonGoldilocks::merkletree_avx512(dst, buffer, ncols, ext_size);
+#else
         PoseidonGoldilocks::merkletree_avx(dst, buffer, ncols, ext_size);
+#endif
         if (toFree)
         {
             free(buffer);
