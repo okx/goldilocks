@@ -1936,6 +1936,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
     int lg2ext = log2(ext_size);
 
 #ifdef GPU_TIMING
+    TimerStart(LDE_MerkleTree_MultiGPU_Prepare);
     TimerStart(LDE_MerkleTree_MultiGPU_PrepareGPUs);
 #endif
 #pragma omp parallel for num_threads(nDevices)
@@ -1954,7 +1955,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
     }
 
 #ifdef GPU_TIMING
-
+    TimerStopAndLog(LDE_MerkleTree_MultiGPU_PrepareGPUs);
 #endif
 
     Goldilocks::Element *aux[MAX_GPUS];
@@ -1986,7 +1987,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
     {
       CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
     }
-    TimerStopAndLog(LDE_MerkleTree_MultiGPU_PrepareGPUs);
+    TimerStart(LDE_MerkleTree_MultiGPU_Prepare);
 #endif
 
 #ifdef GPU_TIMING
