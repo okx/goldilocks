@@ -1954,11 +1954,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
     }
 
 #ifdef GPU_TIMING
-    for (uint32_t d = 0; d < nDevices; d++)
-    {
-        CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
-    }
-    TimerStopAndLog(LDE_MerkleTree_MultiGPU_PrepareGPUs);
+
 #endif
 
     Goldilocks::Element *aux[MAX_GPUS];
@@ -1986,6 +1982,11 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
     }
 #ifdef GPU_TIMING
     TimerStopAndLog(LDE_MerkleTree_MultiGPU_SplitColsOnCPU);
+    for (uint32_t d = 0; d < nDevices; d++)
+    {
+      CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
+    }
+    TimerStopAndLog(LDE_MerkleTree_MultiGPU_PrepareGPUs);
 #endif
 
 #ifdef GPU_TIMING
