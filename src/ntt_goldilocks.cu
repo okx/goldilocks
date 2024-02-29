@@ -1987,7 +1987,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
     {
       CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
     }
-    TimerStart(LDE_MerkleTree_MultiGPU_Prepare);
+    TimerStopAndLog(LDE_MerkleTree_MultiGPU_Prepare);
 #endif
 
 #ifdef GPU_TIMING
