@@ -221,18 +221,18 @@ __global__ void init_twiddle_factors_second_step(gl64_t *fwd_twiddles, gl64_t *i
   }
 }
 
-void init_twiddle_factors(gl64_t *fwd_twiddles, gl64_t *inv_twiddles, uint32_t log_domain_size)
+void init_twiddle_factors(cudaStream_t stream, gl64_t *fwd_twiddles, gl64_t *inv_twiddles, uint32_t log_domain_size)
 {
   if (log_domain_size <= 13)
   {
-    init_twiddle_factors_small_size<<<1, 1>>>(fwd_twiddles, inv_twiddles, log_domain_size);
+    init_twiddle_factors_small_size<<<1, 1, 0, stream>>>(fwd_twiddles, inv_twiddles, log_domain_size);
     CHECKCUDAERR(cudaGetLastError());
   }
   else
   {
-    init_twiddle_factors_first_step<<<1, 1>>>(fwd_twiddles, inv_twiddles, log_domain_size);
+    init_twiddle_factors_first_step<<<1, 1, 0, stream>>>(fwd_twiddles, inv_twiddles, log_domain_size);
     CHECKCUDAERR(cudaGetLastError());
-    init_twiddle_factors_second_step<<<1 << 12, 1>>>(fwd_twiddles, inv_twiddles, log_domain_size);
+    init_twiddle_factors_second_step<<<1 << 12, 1, 0, stream>>>(fwd_twiddles, inv_twiddles, log_domain_size);
     CHECKCUDAERR(cudaGetLastError());
   }
 }
@@ -268,18 +268,18 @@ __global__ void init_r_second_step(gl64_t *r, uint32_t log_domain_size)
   }
 }
 
-void init_r(gl64_t *r, uint32_t log_domain_size)
+void init_r(cudaStream_t stream, gl64_t *r, uint32_t log_domain_size)
 {
   if (log_domain_size <= 12)
   {
-    init_r_small_size<<<1, 1>>>(r, log_domain_size);
+    init_r_small_size<<<1, 1, 0, stream>>>(r, log_domain_size);
     CHECKCUDAERR(cudaGetLastError());
   }
   else
   {
-    init_r_first_step<<<1, 1>>>(r, log_domain_size);
+    init_r_first_step<<<1, 1, 0, stream>>>(r, log_domain_size);
     CHECKCUDAERR(cudaGetLastError());
-    init_r_second_step<<<1 << 12, 1>>>(r, log_domain_size);
+    init_r_second_step<<<1 << 12, 1, 0, stream>>>(r, log_domain_size);
     CHECKCUDAERR(cudaGetLastError());
   }
 }
