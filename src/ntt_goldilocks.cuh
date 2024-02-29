@@ -302,15 +302,15 @@ void ntt_cuda(cudaStream_t stream, gl64_t *data, gl64_t *r, gl64_t *fwd_twiddles
     gridDim = dim3(1);
   }
 
-#ifdef GPU_TIMING
-  TimerStart(NTT_Core_ReversePermutation);
-#endif
+//#ifdef GPU_TIMING
+//  TimerStart(NTT_Core_ReversePermutation);
+//#endif
   reverse_permutation<<<gridDim, blockDim, 0, stream>>>(data, log_domain_size, ncols);
   // CHECKCUDAERR(cudaGetLastError());
-#ifdef GPU_TIMING
-  cudaStreamSynchronize(stream);
-  TimerStopAndLog(NTT_Core_ReversePermutation);
-#endif
+//#ifdef GPU_TIMING
+//  cudaStreamSynchronize(stream);
+//  TimerStopAndLog(NTT_Core_ReversePermutation);
+//#endif
 
 #ifdef __PRINT_LOG__
   uint64_t *log = (uint64_t *)malloc(MAX_LOG_ITEMS * sizeof(uint64_t));
@@ -330,27 +330,27 @@ void ntt_cuda(cudaStream_t stream, gl64_t *data, gl64_t *r, gl64_t *fwd_twiddles
   {
     ptr_twiddles = inv_twiddles;
   }
-#ifdef GPU_TIMING
-  TimerStart(NTT_Core_BRNTTGroup);
-#endif
+//#ifdef GPU_TIMING
+//  TimerStart(NTT_Core_BRNTTGroup);
+//#endif
   for (uint32_t i = 0; i < log_domain_size; i++)
   {
     br_ntt_group<<<domain_size / 2, ncols, 0, stream>>>(data, ptr_twiddles, i, domain_size, ncols);
   }
-#ifdef GPU_TIMING
-  cudaStreamSynchronize(stream);
-  TimerStopAndLog(NTT_Core_BRNTTGroup);
-#endif
+//#ifdef GPU_TIMING
+//  cudaStreamSynchronize(stream);
+//  TimerStopAndLog(NTT_Core_BRNTTGroup);
+//#endif
 
   if (inverse)
   {
-#ifdef GPU_TIMING
-    TimerStart(NTT_Core_INTTScale);
-#endif
+//#ifdef GPU_TIMING
+//    TimerStart(NTT_Core_INTTScale);
+//#endif
     intt_scale<<<domain_size, ncols, 0, stream>>>(data, r, domain_size, log_domain_size, ncols, extend);
-#ifdef GPU_TIMING
-    cudaStreamSynchronize(stream);
-    TimerStopAndLog(NTT_Core_INTTScale);
-#endif
+//#ifdef GPU_TIMING
+//    cudaStreamSynchronize(stream);
+//    TimerStopAndLog(NTT_Core_INTTScale);
+//#endif
   }
 }
