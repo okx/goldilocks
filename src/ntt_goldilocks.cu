@@ -1945,10 +1945,10 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
         CHECKCUDAERR(cudaSetDevice(d));
         CHECKCUDAERR(cudaStreamCreate(gpu_stream + d));
         CHECKCUDAERR(cudaStreamCreate(gpu_stream + nDevices + d));
-        CHECKCUDAERR(cudaMalloc(&gpu_stream[d], &gpu_a[d], aux_ext_size * sizeof(uint64_t)));
-        CHECKCUDAERR(cudaMalloc(&gpu_stream[d], &gpu_r_[d], ext_size * sizeof(uint64_t)));
-        CHECKCUDAERR(cudaMalloc(&gpu_stream[d], &gpu_forward_twiddle_factors[d], ext_size * sizeof(uint64_t)));
-        CHECKCUDAERR(cudaMalloc(&gpu_stream[d], &gpu_inverse_twiddle_factors[d], ext_size * sizeof(uint64_t)));
+        CHECKCUDAERR(cudaMallocAsync(&gpu_a[d], aux_ext_size * sizeof(uint64_t), gpu_stream[d]));
+        CHECKCUDAERR(cudaMallocAsync(&gpu_r_[d], ext_size * sizeof(uint64_t), gpu_stream[d]));
+        CHECKCUDAERR(cudaMallocAsync(&gpu_forward_twiddle_factors[d], ext_size * sizeof(uint64_t), gpu_stream[d]));
+        CHECKCUDAERR(cudaMallocAsync(&gpu_inverse_twiddle_factors[d], ext_size * sizeof(uint64_t), gpu_stream[d]));
         init_twiddle_factors(gpu_stream[d], gpu_forward_twiddle_factors[d], gpu_inverse_twiddle_factors[d], lg2);
         init_twiddle_factors(gpu_stream[d], gpu_forward_twiddle_factors[d], gpu_inverse_twiddle_factors[d], lg2ext);
         init_r(gpu_stream[d], gpu_r_[d], lg2);
