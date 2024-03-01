@@ -2400,6 +2400,16 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_viaCPU(Goldilocks::Element *dst,
 #endif
 }
 
+void NTT_Goldilocks::init_cuda() {
+  int nDevices = 0;
+  CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
+#pragma omp parallel for num_threads(nDevices)
+  for (uint32_t d = 0; d < nDevices; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+  }
+}
+
 void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_Init(u_int64_t size, u_int64_t ext_size, u_int64_t ncols)
 {
     int lg2 = log2(size);
