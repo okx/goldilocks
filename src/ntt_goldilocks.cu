@@ -2087,15 +2087,15 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
         }
 
 // sync memcpy
-        if (buffer != NULL)
-        {
-#pragma omp parallel for num_threads(nDevices)
-            for (uint32_t d = 0; d < nDevices; d++)
-            {
-                CHECKCUDAERR(cudaSetDevice(d));
-                CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[nDevices + d]));
-            }
-        }
+//        if (buffer != NULL)
+//        {
+//#pragma omp parallel for num_threads(nDevices)
+//            for (uint32_t d = 0; d < nDevices; d++)
+//            {
+//                CHECKCUDAERR(cudaSetDevice(d));
+//                CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[nDevices + d]));
+//            }
+//        }
 
 #ifdef GPU_TIMING
         TimerStopAndLog(LDE_MerkleTree_MultiGPU_MerkleTree_Transpose);
