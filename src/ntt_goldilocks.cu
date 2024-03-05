@@ -1928,6 +1928,7 @@ void NTT_Goldilocks::test_memcpy(Goldilocks::Element *dst, Goldilocks::Element *
   for (uint32_t d = 0; d < nDevices; d++)
   {
     CHECKCUDAERR(cudaSetDevice(d));
+    CHECKCUDAERR(cudaStreamCreate(gpu_stream + d));
     uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
     CHECKCUDAERR(cudaMalloc(&gpu_a[d], ext_size * aux_ncols * sizeof(uint64_t)));
   }
@@ -1940,7 +1941,12 @@ void NTT_Goldilocks::test_memcpy(Goldilocks::Element *dst, Goldilocks::Element *
   {
     CHECKCUDAERR(cudaSetDevice(d));
     uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
-    CHECKCUDAERR(cudaMemcpy(gpu_a[d], src + ext_size * ncols_per_gpu, ext_size * aux_ncols * sizeof(gl64_t), cudaMemcpyHostToDevice));
+    CHECKCUDAERR(cudaMemcpyAsync(gpu_a[d], src + ext_size * ncols_per_gpu, ext_size * aux_ncols * sizeof(gl64_t), cudaMemcpyHostToDevice, gpu_stream[d]));
+  }
+#pragma omp parallel for num_threads(nDevices)
+  for (uint32_t d = 0; d < nDevices; d++)
+  {
+    CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
   }
   TimerStopAndLog(test_memcpy_cudaMemcpy1);
 
@@ -1951,7 +1957,12 @@ void NTT_Goldilocks::test_memcpy(Goldilocks::Element *dst, Goldilocks::Element *
   {
     CHECKCUDAERR(cudaSetDevice(d));
     uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
-    CHECKCUDAERR(cudaMemcpy(dst + ext_size * ncols_per_gpu, gpu_a[d], ext_size * aux_ncols * sizeof(gl64_t), cudaMemcpyDeviceToHost));
+    CHECKCUDAERR(cudaMemcpyAsync(dst + ext_size * ncols_per_gpu, gpu_a[d], ext_size * aux_ncols * sizeof(gl64_t), cudaMemcpyDeviceToHost, gpu_stream[d]));
+  }
+#pragma omp parallel for num_threads(nDevices)
+  for (uint32_t d = 0; d < nDevices; d++)
+  {
+    CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
   }
   TimerStopAndLog(test_memcpy_cudaMemcpy2);
 }
