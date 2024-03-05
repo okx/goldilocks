@@ -65,7 +65,7 @@ public:
     void static partial_hash_init_gpu(uint64_t **state, uint32_t num_rows, uint32_t ngpus);
     void static partial_hash_gpu(uint64_t *input, uint32_t num_cols, uint32_t num_rows, uint64_t *state);
     void static merkletree_cuda_from_partial(Goldilocks::Element *tree, uint64_t *gpu_input, uint64_t num_cols, uint64_t num_rows, uint32_t gpu_id = 0, int nThreads = 0, uint64_t dim = 1);
-    void static merkletree_cuda_multi_gpu_full(Goldilocks::Element *tree, uint64_t** gpu_inputs, uint64_t** gpu_trees, void* gpu_streams, uint64_t num_cols, uint64_t num_rows, uint64_t num_rows_device, uint32_t const ngpu, uint64_t dim = 1);
+    void static merkletree_cuda_multi_gpu_full(Goldilocks::Element *tree, uint64_t** gpu_inputs, uint64_t** gpu_trees, void* gpu_streams, uint64_t num_cols, uint64_t num_rows, uint64_t num_rows_device, uint32_t const ngpu, Goldilocks::Element *buffer = NULL, uint64_t dim = 1);
 #endif
 
 #ifdef __AVX512__
