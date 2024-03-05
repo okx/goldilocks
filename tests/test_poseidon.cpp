@@ -81,35 +81,11 @@ TEST(GOLDILOCKS_TEST, full)
   ntt.LDE_MerkleTree_MultiGPU_v3(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
 
-  free(a);
-  free(b);
-  free(c);
-}
-
-TEST(GOLDILOCKS_TEST, cost)
-{
-  Goldilocks::Element *a = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
-  Goldilocks::Element *b = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
-  for (uint i = 0; i < 2; i++)
-  {
-    for (uint j = 0; j < NUM_COLUMNS; j++)
-    {
-      Goldilocks::add(a[i * NUM_COLUMNS + j], Goldilocks::one(), Goldilocks::fromU64(j));
-    }
-  }
-
-  for (uint64_t i = 2; i < FFT_SIZE; i++)
-  {
-    for (uint j = 0; j < NUM_COLUMNS; j++)
-    {
-      a[i * NUM_COLUMNS + j] = a[NUM_COLUMNS * (i - 1) + j] + a[NUM_COLUMNS * (i - 2) + j];
-    }
-  }
-
   ntt.test_memcpy(b, a);
 
   free(a);
   free(b);
+  free(c);
 }
 
 TEST(GOLDILOCKS_TEST, full_cpu)
