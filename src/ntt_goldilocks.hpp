@@ -220,6 +220,7 @@ public:
         this->use_gpu = b;
     }
     void init_cuda();
+    void test_memcpy();
 #endif  // __USE_CUDA__
 
     void reversePermutation(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t offset_cols, u_int64_t ncols, u_int64_t ncols_all, uint32_t numThreads);

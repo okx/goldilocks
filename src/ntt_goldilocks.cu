@@ -1911,6 +1911,51 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v2(Goldilocks::Element *dst, Goldil
 #endif
 }
 
+void NTT_Goldilocks::test_memcpy(Goldilocks::Element *dst, Goldilocks::Element *src) {
+
+  TimerStart(test_memcpy_init);
+  uint64_t ncols = 669;
+  uint64_t ext_size = 1<<24;
+  int nDevices = 0;
+  CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
+  uint64_t ncols_per_gpu = (ncols % nDevices) ? ncols / nDevices + 1 : ncols / nDevices;
+  uint64_t ncols_last_gpu = ncols - ncols_per_gpu * (nDevices - 1);
+  uint64_t aux_ext_size = ext_size * ncols_per_gpu;
+  gl64_t *gpu_a[MAX_GPUS];
+  TimerStopAndLog(test_memcpy_init);
+
+  TimerStart(test_memcpy_cudaMalloc);
+#pragma omp parallel for num_threads(nDevices)
+  for (uint32_t d = 0; d < nDevices; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    CHECKCUDAERR(cudaMalloc(&gpu_a[d], aux_ext_size * sizeof(uint64_t)));
+  }
+  TimerStopAndLog(test_memcpy_cudaMalloc);
+
+
+  TimerStart(test_memcpy_cudaMemcpy1);
+#pragma omp parallel for num_threads(nDevices)
+  for (uint32_t d = 0; d < nDevices; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
+    CHECKCUDAERR(cudaMemcpy(gpu_a[d], src + ext_size*ncols, ext_size * aux_ncols * sizeof(gl64_t), cudaMemcpyHostToDevice));
+  }
+  TimerStopAndLog(test_memcpy_cudaMemcpy1);
+
+
+  TimerStart(test_memcpy_cudaMemcpy2);
+#pragma omp parallel for num_threads(nDevices)
+  for (uint32_t d = 0; d < nDevices; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    uint64_t aux_ncols = (d == nDevices - 1) ? ncols_last_gpu : ncols_per_gpu;
+    CHECKCUDAERR(cudaMemcpy(dst + ext_size*ncols, gpu_a[d], ext_size * aux_ncols * sizeof(gl64_t), cudaMemcpyDeviceToHost));
+  }
+  TimerStopAndLog(test_memcpy_cudaMemcpy2);
+}
+
 void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, bool buildMerkleTree)
 {
     if (ncols == 0 || size == 0)
