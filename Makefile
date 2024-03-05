@@ -121,7 +121,7 @@ runfullcpu: fullgpu
 	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full_cpu
 
 runcopy: fullgpu
-	./fullgpu --gtest_filter=GOLDILOCKS_TEST.copy
+	./fullgpu --gtest_filter=GOLDILOCKS_TEST.cost
 
 tnttgpu: tests/test_ntt.cpp $(ALLSRCS)
 	$(CXX) -D__USE_CUDA__ tests/test_ntt.cpp -O3 -pthread -fopenmp -mavx2 -c
