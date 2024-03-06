@@ -1,6 +1,7 @@
 #include "../src/goldilocks_base_field.hpp"
 #include "../src/ntt_goldilocks.hpp"
 #include "../src/poseidon_goldilocks.hpp"
+#include "../utils/cuda_utils.hpp"
 
 #include <sys/time.h>
 #include <sys/mman.h>
@@ -200,13 +201,23 @@ int test(char* path, int testId) {
     printf("Number of input elements %lu\n", ine);
     uint64_t tree_size = (2 * extension * iparams[0] - 1) * 4;  // 2n-1 but n is extended
     printf("Number of tree elements %lu\n", tree_size);
+    /*
     Goldilocks::Element *tree1 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
     assert(tree1 != NULL);
     Goldilocks::Element *out1 = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
     assert(out1 != NULL);
     Goldilocks::Element * tree2 = (Goldilocks::Element*)malloc(tree_size * sizeof(Goldilocks::Element));
     assert(tree2 != NULL);
-     Goldilocks::Element *out2 = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
+    Goldilocks::Element *out2 = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
+    assert(out2 != NULL);
+    */
+   Goldilocks::Element *tree1 = (Goldilocks::Element*)alloc_pinned_mem(tree_size * sizeof(Goldilocks::Element));
+    assert(tree1 != NULL);
+    Goldilocks::Element *out1 = (Goldilocks::Element *)alloc_pinned_mem(one * sizeof(Goldilocks::Element));
+    assert(out1 != NULL);
+    Goldilocks::Element * tree2 = (Goldilocks::Element*)alloc_pinned_mem(tree_size * sizeof(Goldilocks::Element));
+    assert(tree2 != NULL);
+    Goldilocks::Element *out2 = (Goldilocks::Element *)alloc_pinned_mem(one * sizeof(Goldilocks::Element));
     assert(out2 != NULL);
 
     NTT_Goldilocks ntt(extension * iparams[0]);
@@ -262,8 +273,10 @@ int test(char* path, int testId) {
 
     int ret = comp_output(out1, out2, one);
 
-    free(out1);
-    free(out2);
+    // free(out1);
+    // free(out2);
+    free_pinned_mem(out1);
+    free_pinned_mem(out2);
 
 /*
     one = 2 * ine;
@@ -274,8 +287,10 @@ int test(char* path, int testId) {
 */
 
     ret = comp_output(tree1, tree2, tree_size);
-    free(tree1);
-    free(tree2);
+    // free(tree1);
+    // free(tree2);
+    free_pinned_mem(tree1);
+    free_pinned_mem(tree2);
 
     printf("Test id %d done.\n\n", testId);
     return ret;

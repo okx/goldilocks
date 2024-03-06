@@ -158,6 +158,40 @@ __global__ void transpose(uint64_t *dst, uint64_t *src, uint32_t nblocks, uint32
     }
 }
 
+__global__ void transpose_opt(uint64_t *dst, uint64_t *src, uint32_t nblocks, uint32_t nrows, uint32_t ncols, uint32_t ncols_last_block, uint32_t nrb)
+{
+        __shared__ uint64_t row[1056];
+
+        int ncols_total = (nblocks - 1) * ncols + ncols_last_block;
+        // tid is the destination column
+        int tid = threadIdx.x;
+        if (tid >= ncols_total)
+                return;
+
+        // bid is the destination/source row
+        int bid = blockIdx.x * nrb;
+        if (bid >= nrows)
+                return;
+
+        int k = tid / ncols;
+        int nc = ncols;
+        if (k == nblocks-1)
+        {
+                nc = ncols_last_block;
+        }
+        int j = tid % ncols;
+
+        for (int r = bid; r < bid + nrb; r++)
+        {
+                uint64_t *pdst = dst + r * ncols_total + tid;
+                uint64_t *psrc = src + (k * ncols * nrows) + r * nc + j;
+                row[tid] = *psrc;
+                __syncthreads();
+                *pdst = row[tid];
+                __syncthreads();
+        }
+}
+
 /**
  * @brief permutation of components of an array in bit-reversal order. If dst==src the permutation is performed on-site.
  *
@@ -2063,7 +2097,8 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
         for (uint32_t d = 0; d < nDevices; d++)
         {
             CHECKCUDAERR(cudaSetDevice(d));
-            transpose<<<ceil(nrows_per_gpu / (1.0 * TPB_V1)), TPB_V1, 0, gpu_stream[d]>>>((uint64_t *)gpu_a[d], (uint64_t *)gpu_a2[d], nDevices, nrows_per_gpu, ncols_per_gpu, ncols_last_gpu);
+            // transpose<<<ceil(nrows_per_gpu / (1.0 * TPB_V1)), TPB_V1, 0, gpu_stream[d]>>>((uint64_t *)gpu_a[d], (uint64_t *)gpu_a2[d], nDevices, nrows_per_gpu, ncols_per_gpu, ncols_last_gpu);
+            transpose_opt<<<128, ncols, 0, gpu_stream[d]>>>((uint64_t *)gpu_a[d], (uint64_t *)gpu_a2[d], nDevices, nrows_per_gpu, ncols_per_gpu, ncols_last_gpu, nrows_per_gpu / 128);
             CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
         }
 
@@ -2073,7 +2108,6 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
             for (uint64_t d = 0; d < nDevices; d++)
             {
                 CHECKCUDAERR(cudaSetDevice(d));
-                // CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
                 CHECKCUDAERR(cudaMemcpyAsync(buffer + d * (nrows_per_gpu * ncols), gpu_a[d], nrows_per_gpu * ncols * sizeof(uint64_t), cudaMemcpyDeviceToHost, gpu_stream[nDevices + d]));
             }
         }
@@ -2087,6 +2121,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
         }
 
 // sync memcpy
+/*
         if (buffer != NULL)
         {
 #pragma omp parallel for num_threads(nDevices)
@@ -2096,6 +2131,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
                 CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[nDevices + d]));
             }
         }
+*/
 
 #ifdef GPU_TIMING
         TimerStopAndLog(LDE_MerkleTree_MultiGPU_MerkleTree_Transpose);
