@@ -1,5 +1,5 @@
-#ifndef __CUDA_UTILS_H__
-#define __CUDA_UTILS_H__
+#ifndef __CUDA_UTILS_CUH__
+#define __CUDA_UTILS_CUH__
 
 #include <cuda.h>
 #include <stdio.h>
@@ -33,4 +33,4 @@ __device__ __forceinline__ void mymemset(uint64_t* dst, uint64_t v, size_t n)
     }
 }
 
-#endif  // __CUDA_UTILS_H__
+#endif  // __CUDA_UTILS_CUH__

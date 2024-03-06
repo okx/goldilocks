@@ -211,7 +211,7 @@ int test(char* path, int testId) {
     Goldilocks::Element *out2 = (Goldilocks::Element *)malloc(one * sizeof(Goldilocks::Element));
     assert(out2 != NULL);
     */
-   Goldilocks::Element *tree1 = (Goldilocks::Element*)alloc_pinned_mem(tree_size * sizeof(Goldilocks::Element));
+    Goldilocks::Element *tree1 = (Goldilocks::Element*)alloc_pinned_mem(tree_size * sizeof(Goldilocks::Element));
     assert(tree1 != NULL);
     Goldilocks::Element *out1 = (Goldilocks::Element *)alloc_pinned_mem(one * sizeof(Goldilocks::Element));
     assert(out1 != NULL);
@@ -240,6 +240,7 @@ int test(char* path, int testId) {
 
     // memset(tmp, 0, 2 * ine * sizeof(Goldilocks::Element));
     ntt.setUseGPU(true);
+    warmup_all_gpus();
     gettimeofday(&start, NULL);
     // ntt.LDE_MerkleTree_MultiGPU_Init(iparams[0], extension * iparams[0], iparams[1]);
     // ntt.INTT(tmp, idata, iparams[0], iparams[1], NULL, 3, 1, true);

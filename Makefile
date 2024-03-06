@@ -63,7 +63,7 @@ $(BUILD_DIR)/%.cc.o: %.cc
 
 $(BUILD_DIR)/%.cu.o: %.cu
 	$(MKDIR_P) $(dir $@)
-	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 -arch=$(CUDA_ARCH) -g -dc $< --output-file $@
+	$(NVCC) -D__USE_CUDA__ -Iutils -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 -arch=$(CUDA_ARCH) -g -dc $< --output-file $@
 
 .PHONY: clean
 
@@ -97,8 +97,8 @@ tnttgpu: tests/test_ntt.cpp $(ALLSRCS)
 	$(CXX) src/goldilocks_base_field.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_base_field.o
 	$(CXX) utils/timer.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o timer.o
 	$(CXX) -D__USE_CUDA__ src/poseidon_goldilocks.cpp -fPIC -O3 -Wall -pthread -fopenmp -mavx2 -c -o poseidon_goldilocks.o
-	$(NVCC) -D__USE_CUDA__ -Iutils/ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler -mavx2 -Xcompiler -O3 src/ntt_goldilocks.cu -arch=$(CUDA_ARCH) -dc --output-file ntt_goldilocks_gpu.o
-	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler -mavx2 src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) -O3 -dc --output-file poseidon_goldilocks_gpu.o
+	$(NVCC) -D__USE_CUDA__ -Iutils -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler -mavx2 -Xcompiler -O3 src/ntt_goldilocks.cu -arch=$(CUDA_ARCH) -dc --output-file ntt_goldilocks_gpu.o
+	$(NVCC) -D__USE_CUDA__ -Iutils -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 -Xcompiler -mavx2 src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) -O3 -dc --output-file poseidon_goldilocks_gpu.o
 	$(NVCC) -D__USE_CUDA__ -Xcompiler -fPIC -Xcompiler -O3 utils/cuda_utils.cu -arch=$(CUDA_ARCH) -dc --output-file cuda_utils_gpu.o
 	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -O3 -o $@ test_ntt.o timer.o goldilocks_base_field.o ntt_goldilocks_gpu.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o cuda_utils_gpu.o -lgtest -lgmp
 
