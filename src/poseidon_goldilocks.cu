@@ -105,19 +105,25 @@ __device__ __constant__ uint64_t GPU_P[144];
 
 void init_gpu_const(int nDevices = 0)
 {
-    if (nDevices == 0)
+    static int initialized = 0;
+
+    if (initialized == 0)
     {
-        CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
+        initialized = 1;
+        if (nDevices == 0)
+        {
+            CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
+        }
+        for (int i = 0; i < nDevices; i++)
+        {
+            CHECKCUDAERR(cudaSetDevice(i));
+            CHECKCUDAERR(cudaMemcpyToSymbol(GPU_M, PoseidonGoldilocksConstants::M, 144 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
+            CHECKCUDAERR(cudaMemcpyToSymbol(GPU_P, PoseidonGoldilocksConstants::P, 144 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
+            CHECKCUDAERR(cudaMemcpyToSymbol(GPU_C, PoseidonGoldilocksConstants::C, 118 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
+            CHECKCUDAERR(cudaMemcpyToSymbol(GPU_S, PoseidonGoldilocksConstants::S, 507 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
+        }
+        CHECKCUDAERR(cudaSetDevice(0));
     }
-    for (int i = 0; i < nDevices; i++)
-    {
-        CHECKCUDAERR(cudaSetDevice(i));
-        CHECKCUDAERR(cudaMemcpyToSymbol(GPU_M, PoseidonGoldilocksConstants::M, 144 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
-        CHECKCUDAERR(cudaMemcpyToSymbol(GPU_P, PoseidonGoldilocksConstants::P, 144 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
-        CHECKCUDAERR(cudaMemcpyToSymbol(GPU_C, PoseidonGoldilocksConstants::C, 118 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
-        CHECKCUDAERR(cudaMemcpyToSymbol(GPU_S, PoseidonGoldilocksConstants::S, 507 * sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
-    }
-    CHECKCUDAERR(cudaSetDevice(0));
 }
 
 __device__ void hash_full_result_seq(gl64_t *state, const gl64_t *input, const gl64_t *GPU_C_GL, const gl64_t *GPU_S_GL, const gl64_t *GPU_M_GL, const gl64_t *GPU_P_GL)
