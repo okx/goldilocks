@@ -14,6 +14,10 @@
 #define N_PARTIAL_ROUNDS 22
 #define N_ROUNDS (N_FULL_ROUNDS_TOTAL + N_PARTIAL_ROUNDS)
 
+// Poseidon 2
+#define ROUNDS_F 8
+#define ROUNDS_P 22
+
 class PoseidonGoldilocks
 {
 
@@ -30,6 +34,11 @@ private:
     inline void static pow7_avx(__m256i &st0, __m256i &st1, __m256i &st2);
     inline void static add_avx_a(__m256i &st0, __m256i &st1, __m256i &st2, const Goldilocks::Element C[SPONGE_WIDTH]);
     inline void static add_avx_small(__m256i &st0, __m256i &st1, __m256i &st2, const Goldilocks::Element C[SPONGE_WIDTH]);
+
+    inline __m256i static apply_m_4_avx(__m256i & x);
+    inline void static permute_mut_avx(__m256i & s0, __m256i & s1, __m256i & s2);
+    inline void static add_rc_avx(__m256i & s0, __m256i & s1, __m256i & s2, const Goldilocks::Element rc[12]);
+    inline void static internal_layer_avx(__m256i & st0, __m256i & st1, __m256i & st2, const int r_beg, const int r_end);
 
 #ifdef __AVX512__
     inline void static pow7_avx512(__m512i &st0, __m512i &st1, __m512i &st2);
@@ -54,12 +63,14 @@ public:
     // Note, the functions that do not have the _avx suffix are the default ones to
     // be used in the prover, they implement avx vectorixation though.
     void static hash_full_result(Goldilocks::Element *, const Goldilocks::Element *);
+    void static hash_full_result_poseidon2(Goldilocks::Element *, const Goldilocks::Element *);
     void static hash(Goldilocks::Element (&state)[CAPACITY], const Goldilocks::Element (&input)[SPONGE_WIDTH]);
+    void static hash_poseidon2(Goldilocks::Element (&state)[CAPACITY], const Goldilocks::Element (&input)[SPONGE_WIDTH]);
     void static linear_hash(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t size);
     void static merkletree_avx(Goldilocks::Element *tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, int nThreads = 0, uint64_t dim = 1);
     void static merkletree_batch_avx(Goldilocks::Element *tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, uint64_t batch_size, int nThreads = 0, uint64_t dim = 1);
 
-#ifdef __USE_CUDA__    
+#ifdef __USE_CUDA__
     void static merkletree_cuda(Goldilocks::Element *tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, int nThreads = 0, uint64_t dim = 1);
     void static merkletree_cuda_gpudata(Goldilocks::Element *tree, uint64_t *gpu_input, uint64_t num_cols, uint64_t num_rows, int nThreads = 0, uint64_t dim = 1);
     void static partial_hash_init_gpu(uint64_t **state, uint32_t num_rows, uint32_t ngpus);

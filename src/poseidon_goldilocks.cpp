@@ -226,6 +226,119 @@ void PoseidonGoldilocks::hash_full_result(Goldilocks::Element *state, const Gold
     Goldilocks::store_avx(&(state[4]), st1);
     Goldilocks::store_avx(&(state[8]), st2);
 }
+
+__m256i PoseidonGoldilocks::apply_m_4_avx(__m256i & x)
+{
+    int64_t tt[4], vv[4];
+    __m256i y = _mm256_permute4x64_epi64(x, 0xf5);
+    __m256i t, v;
+    Goldilocks::add_avx(t, x, y);
+    _mm256_storeu_si256((__m256i*)tt, t);
+    y = _mm256_set_epi64x(tt[0], 0, tt[2], 0);
+    Goldilocks::add_avx(v, t, y);
+    _mm256_storeu_si256((__m256i*)tt, v);
+    y = _mm256_set_epi64x(0, 0, tt[2], tt[0]);
+    Goldilocks::add_avx(t, y, y);
+    Goldilocks::add_avx(v, t, t);
+    y = _mm256_set_epi64x(0, 0, tt[3], tt[1]);
+    Goldilocks::add_avx(t, v, y);
+    y = _mm256_set_epi64x(0, 0, tt[1], tt[3]);
+    _mm256_storeu_si256((__m256i*)tt, t);
+    Goldilocks::add_avx(v, t, y);
+    _mm256_storeu_si256((__m256i*)vv, v);
+    return _mm256_set_epi64x(tt[1], vv[1], tt[0], vv[0]);
+}
+
+void PoseidonGoldilocks::permute_mut_avx(__m256i & s0, __m256i & s1, __m256i & s2)
+{
+    __m256i r0 = apply_m_4_avx(s0);
+    __m256i r1 = apply_m_4_avx(s1);
+    __m256i r2 = apply_m_4_avx(s2);
+    __m256i s3, s4;
+    Goldilocks::add_avx(s3, r0, r1);
+    Goldilocks::add_avx(s4, r2, s3);
+    Goldilocks::add_avx(s0, r0, s4);
+    Goldilocks::add_avx(s1, r1, s4);
+    Goldilocks::add_avx(s2, r2, s4);
+}
+
+inline void PoseidonGoldilocks::add_rc_avx(__m256i & s0, __m256i & s1, __m256i & s2, const Goldilocks::Element rc[12])
+{
+    __m256i rc0, rc1, rc2;
+    Goldilocks::load_avx(rc0, &(rc[0]));
+    Goldilocks::load_avx(rc1, &(rc[4]));
+    Goldilocks::load_avx(rc2, &(rc[8]));
+    Goldilocks::add_avx(s0, s0, rc0);
+    Goldilocks::add_avx(s1, s1, rc1);
+    Goldilocks::add_avx(s2, s2, rc2);
+}
+
+void PoseidonGoldilocks::internal_layer_avx(__m256i & st0, __m256i & st1, __m256i & st2, const int r_beg, const int r_end)
+{
+    // The internal rounds.
+    __m256i m0, m1, m2, ss0, ss1, ss2, ss, p10, p11, p12;
+    Goldilocks::load_avx(m0, &(PoseidonGoldilocksConstants::MATRIX_DIAG_12_GOLDILOCKS[0]));
+    Goldilocks::load_avx(m1, &(PoseidonGoldilocksConstants::MATRIX_DIAG_12_GOLDILOCKS[4]));
+    Goldilocks::load_avx(m2, &(PoseidonGoldilocksConstants::MATRIX_DIAG_12_GOLDILOCKS[8]));
+
+    Goldilocks::Element sx[4];
+
+    for (int r = r_beg; r < r_end; r++)
+    {
+        Goldilocks::store_avx(sx, st0);
+        sx[0] = sx[0] + PoseidonGoldilocksConstants::RC12[r][0];
+        PoseidonGoldilocks::pow7(sx[0]);
+        Goldilocks::load_avx(st0, sx);
+        Goldilocks::add_avx(ss0, st0, st1);
+        Goldilocks::add_avx(ss1, st2, ss0);
+        ss2 = _mm256_permute4x64_epi64(ss1, 0x93); // [0, 1, 2, 3] -> [3, 0, 1, 2]
+        Goldilocks::add_avx(ss0, ss1, ss2);
+        ss1 = _mm256_permute4x64_epi64(ss2, 0x93); // [0, 1, 2, 3] -> [3, 0, 1, 2]
+        Goldilocks::add_avx(ss2, ss0, ss1);
+        ss0 = _mm256_permute4x64_epi64(ss1, 0x93); // [0, 1, 2, 3] -> [3, 0, 1, 2]
+        Goldilocks::add_avx(ss, ss0, ss2);
+        Goldilocks::mult_avx(p10, st0, m0);
+        Goldilocks::mult_avx(p11, st1, m1);
+        Goldilocks::mult_avx(p12, st2, m2);
+        Goldilocks::add_avx(st0, p10, ss);
+        Goldilocks::add_avx(st1, p11, ss);
+        Goldilocks::add_avx(st2, p12, ss);
+    }
+}
+
+void PoseidonGoldilocks::hash_full_result_poseidon2(Goldilocks::Element *state, const Goldilocks::Element *input)
+{
+    const int length = SPONGE_WIDTH * sizeof(Goldilocks::Element);
+    std::memcpy(state, input, length);
+    __m256i st0, st1, st2;
+    Goldilocks::load_avx(st0, &(state[0]));
+    Goldilocks::load_avx(st1, &(state[4]));
+    Goldilocks::load_avx(st2, &(state[8]));
+
+    permute_mut_avx(st0, st1, st2);
+
+    int rounds = ROUNDS_F + ROUNDS_P;
+    int rounds_f_beginning = ROUNDS_F / 2;
+
+    for (int r = 0; r < rounds_f_beginning; r++)
+    {
+        add_rc_avx(st0, st1, st2, PoseidonGoldilocksConstants::RC12[r]);
+        pow7_avx(st0, st1, st2);
+        permute_mut_avx(st0, st1, st2);
+    }
+    // for (int r = rounds_f_beginning; r < rounds_f_beginning + ROUNDS_P; r++)
+    internal_layer_avx(st0, st1, st2, rounds_f_beginning, rounds_f_beginning + ROUNDS_P);
+    for (int r = rounds_f_beginning + ROUNDS_P; r < rounds; r++)
+    {
+        add_rc_avx(st0, st1, st2, PoseidonGoldilocksConstants::RC12[r]);
+        pow7_avx(st0, st1, st2);
+        permute_mut_avx(st0, st1, st2);
+    }
+    Goldilocks::store_avx(&(state[0]), st0);
+    Goldilocks::store_avx(&(state[4]), st1);
+    Goldilocks::store_avx(&(state[8]), st2);
+}
+
 void PoseidonGoldilocks::linear_hash(Goldilocks::Element *output, Goldilocks::Element *input, uint64_t size)
 {
     uint64_t remaining = size;
