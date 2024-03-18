@@ -602,7 +602,9 @@ int main() {
   free(a);
   free(b);
 }
-#elifdef __TEST2__
+#endif //__TEST__
+
+#ifdef __TEST2__
 int main() {
   CHECKCUDAERR(cudaSetDevice(0));
   uint32_t log_domain_size = 23;
@@ -642,4 +644,4 @@ int main() {
   cudaFree(b);
 }
 
-#endif //__TEST__
+#endif //__TEST2__
