@@ -631,7 +631,7 @@ void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full_um(Goldilocks::Element *
       actual_tpb = TPB;
       actual_blks = nextN / TPB + 1;
     }
-    hash_gpu<<<actual_blks, actual_tpb>>>(nextN, nextIndex, pending, tree);
+    hash_gpu<<<actual_blks, actual_tpb>>>(nextN, nextIndex, pending, (uint64_t *)tree);
     nextIndex += pending * CAPACITY;
     pending = pending / 2;
     nextN = floor((pending - 1) / 2) + 1;
