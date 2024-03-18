@@ -491,12 +491,86 @@ void extendPol_cuda(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::El
 
 }
 
+void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::Element *src, uint32_t log_N_Extended, uint32_t log_N, uint32_t ncols) {
+
+  CHECKCUDAERR(cudaSetDevice(device_id));
+
+  struct timeval start, end;
+  gettimeofday(&start, NULL);
+
+  uint32_t domain_size = 1<<log_N;
+  uint32_t domain_size_ext = 1<<log_N_Extended;
+
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
+  gettimeofday(&end, NULL);
+  long seconds = end.tv_sec - start.tv_sec;
+  long microseconds = end.tv_usec - start.tv_usec;
+  long elapsed = seconds*1000 + microseconds/1000;
+  printf("malloc elapsed: %ld ms\n", elapsed);
+
+  gettimeofday(&start, NULL);
+  if (dst == NULL) {
+    dst = src;
+  } else {
+    CHECKCUDAERR(cudaMemcpyAsync(dst, src, domain_size * ncols * sizeof(gl64_t), cudaMemcpyHostToDevice, stream));
+  }
+  CHECKCUDAERR(cudaMemsetAsync(dst + domain_size * ncols, 0, domain_size * ncols * sizeof(gl64_t), stream));
+  //CHECKCUDAERR(cudaMemPrefetchAsync((void*)dst, domain_size * ncols * sizeof(gl64_t), device_id, stream));
+  cudaStreamSynchronize(stream);
+  gettimeofday(&end, NULL);
+  seconds = end.tv_sec - start.tv_sec;
+  microseconds = end.tv_usec - start.tv_usec;
+  elapsed = seconds*1000 + microseconds/1000;
+  printf("memcpy elapsed: %ld ms\n", elapsed);
+
+  ntt_cuda(stream, dst, log_N, ncols, true, true);
+
+#ifdef  __PRINT_LOG__
+  uint64_t *log = (uint64_t *)malloc(MAX_LOG_ITEMS * sizeof(uint64_t));
+  CHECKCUDAERR(cudaMemcpy(log, d_data, MAX_LOG_ITEMS * sizeof(gl64_t), cudaMemcpyDeviceToHost));
+  printf("\nintt outputs:\n");
+  printf("[");
+  for (uint j = 0; j < domain_size * ncols && j < MAX_LOG_ITEMS; j++)
+  {
+    printf("%lu, ", log[j]);
+  }
+  printf("]\n");
+  free(log);
+#endif
+
+  ntt_cuda(stream, dst, log_N_Extended, ncols, false, false);
+
+  cudaStreamSynchronize(stream);
+
+  {
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+    CHECKCUDAERR(cudaMemPrefetchAsync((void*)dst, domain_size * ncols * sizeof(gl64_t), cudaCpuDeviceId));
+
+    gettimeofday(&end, NULL);
+    seconds = end.tv_sec - start.tv_sec;
+    microseconds = end.tv_usec - start.tv_usec;
+    elapsed = seconds*1000 + microseconds/1000;
+    printf("cudaMemcpy elapsed: %ld ms\n", elapsed);
+  }
+
+  cudaStreamDestroy(stream);
+
+  gettimeofday(&end, NULL);
+  seconds = end.tv_sec - start.tv_sec;
+  microseconds = end.tv_usec - start.tv_usec;
+  elapsed = seconds*1000 + microseconds/1000;
+  printf("extendPol_cuda total elapsed: %ld ms\n", elapsed);
+
+}
+
 #ifdef  __TEST__
 int main() {
   CHECKCUDAERR(cudaSetDevice(0));
   uint32_t log_domain_size = 23;
   uint32_t domain_size = 1<<log_domain_size;
-  uint32_t ncols = 168;
+  uint32_t ncols = 84;
   uint64_t *a = (uint64_t *)malloc(2*domain_size * ncols * sizeof(uint64_t));
   uint64_t *b = (uint64_t *)malloc(2*domain_size * ncols * sizeof(uint64_t));
   init_input((Goldilocks::Element *)a, domain_size, ncols);
@@ -527,6 +601,45 @@ int main() {
 
   free(a);
   free(b);
+}
+#elifdef __TEST2__
+int main() {
+  CHECKCUDAERR(cudaSetDevice(0));
+  uint32_t log_domain_size = 23;
+  uint32_t domain_size = 1<<log_domain_size;
+  uint32_t ncols = 84;
+  uint64_t *a;
+  cudaMallocManaged(&a, 2*domain_size * ncols * sizeof(uint64_t));
+  uint64_t *b;
+  cudaMallocManaged(&b, 2*domain_size * ncols * sizeof(uint64_t));
+  init_input((Goldilocks::Element *)a, domain_size, ncols);
+
+#ifdef __PRINT_LOG__
+  printf("\ninputs:\n");
+  printf("[");
+  for (uint j = 0; j < domain_size * ncols && j < MAX_LOG_ITEMS; j++)
+  {
+    printf("%lu, ", a[j]);
+  }
+  printf("]\n");
+#endif
+
+  init_parameters_cuda(0, log_domain_size);
+
+  extendPol_cuda2(0, (Goldilocks::Element *)b, (Goldilocks::Element *)a, log_domain_size+1, log_domain_size, ncols);
+
+#ifdef __PRINT_LOG__
+  printf("\noutputs:\n");
+  printf("[");
+  for (uint j = 0; j < 2*domain_size * ncols && j<8; j++)
+  {
+    printf("%lu, ", b[j]);
+  }
+  printf("]\n");
+#endif
+
+  cudaFree(a);
+  cudaFree(b);
 }
 
 #endif //__TEST__
