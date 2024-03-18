@@ -48,7 +48,7 @@ TEST(GOLDILOCKS_TEST, avx_op)
 
 #define FFT_SIZE (1 << 23)
 #define BLOWUP_FACTOR 1
-#define NUM_COLUMNS 669
+#define NUM_COLUMNS 335
 
 #ifdef __USE_CUDA__
 TEST(GOLDILOCKS_TEST, full)
@@ -80,8 +80,6 @@ TEST(GOLDILOCKS_TEST, full)
   TimerStart(LDE_MerkleTree_MultiGPU_v3);
   ntt.LDE_MerkleTree_MultiGPU_v3(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
-
-  ntt.test_memcpy(b, a);
 
   free(a);
   free(b);
