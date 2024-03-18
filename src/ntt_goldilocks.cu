@@ -527,16 +527,13 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
   ntt_cuda(stream, (gl64_t *)dst, log_N, ncols, true, true);
 
 #ifdef  __PRINT_LOG__
-  uint64_t *log = (uint64_t *)malloc(MAX_LOG_ITEMS * sizeof(uint64_t));
-  CHECKCUDAERR(cudaMemcpy(log, d_data, MAX_LOG_ITEMS * sizeof(gl64_t), cudaMemcpyDeviceToHost));
   printf("\nintt outputs:\n");
   printf("[");
   for (uint j = 0; j < domain_size * ncols && j < MAX_LOG_ITEMS; j++)
   {
-    printf("%lu, ", log[j]);
+    printf("%lu, ", dst[j]);
   }
   printf("]\n");
-  free(log);
 #endif
 
   ntt_cuda(stream, (gl64_t *)dst, log_N_Extended, ncols, false, false);
@@ -553,6 +550,7 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
     microseconds = end.tv_usec - start.tv_usec;
     elapsed = seconds*1000 + microseconds/1000;
     printf("cudaMemcpy elapsed: %ld ms\n", elapsed);
+    cudaStreamSynchronize(stream);
   }
 
   cudaStreamDestroy(stream);
@@ -562,7 +560,6 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
   microseconds = end.tv_usec - start.tv_usec;
   elapsed = seconds*1000 + microseconds/1000;
   printf("extendPol_cuda total elapsed: %ld ms\n", elapsed);
-
 }
 
 #ifdef  __TEST__
