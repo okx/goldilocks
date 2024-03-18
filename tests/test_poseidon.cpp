@@ -75,8 +75,6 @@ TEST(GOLDILOCKS_TEST, full)
     }
   }
 
-  ntt.init_cuda();
-
   TimerStart(LDE_MerkleTree_MultiGPU_v3);
   ntt.LDE_MerkleTree_MultiGPU_v3(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
