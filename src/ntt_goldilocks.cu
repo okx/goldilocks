@@ -524,7 +524,7 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
   elapsed = seconds*1000 + microseconds/1000;
   printf("memcpy elapsed: %ld ms\n", elapsed);
 
-  ntt_cuda(stream, dst, log_N, ncols, true, true);
+  ntt_cuda(stream, (gl64_t *)dst, log_N, ncols, true, true);
 
 #ifdef  __PRINT_LOG__
   uint64_t *log = (uint64_t *)malloc(MAX_LOG_ITEMS * sizeof(uint64_t));
@@ -539,7 +539,7 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
   free(log);
 #endif
 
-  ntt_cuda(stream, dst, log_N_Extended, ncols, false, false);
+  ntt_cuda(stream, (gl64_t *)dst, log_N_Extended, ncols, false, false);
 
   cudaStreamSynchronize(stream);
 
