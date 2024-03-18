@@ -79,6 +79,10 @@ TEST(GOLDILOCKS_TEST, full)
   ntt.LDE_MerkleTree_MultiGPU_v3(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
 
+  for (uint64_t i = 0; i < 8; i++) {
+    printf("%lu\n", Goldilocks::toU64(b[i]));
+  }
+
   free(a);
   free(b);
   free(c);
