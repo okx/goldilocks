@@ -65,7 +65,7 @@ $(BUILD_DIR_GPU)/%.cpp.o: %.cpp
 
 $(BUILD_DIR_GPU)/%.cu.o: %.cu
 	$(MKDIR_P) $(dir $@)
-	$(NVCC) -D__USE_CUDA__ -Iutils -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 -arch=$(CUDA_ARCH) -dc $< --output-file $@
+	$(NVCC) -D__USE_CUDA__ -DGPU_TIMING -Iutils -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 -arch=$(CUDA_ARCH) -dc $< --output-file $@
 
 .PHONY: clean
 
