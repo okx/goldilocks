@@ -567,6 +567,77 @@ void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full(Goldilocks::Element *tre
     CHECKCUDAERR(cudaFree(gpu_final_tree));
 }
 
+void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full_um(Goldilocks::Element *tree, uint64_t** gpu_inputs, uint64_t** gpu_trees, void* v_gpu_streams, uint64_t num_cols, uint64_t num_rows, uint64_t num_rows_device, uint32_t const ngpu, uint64_t dim)
+{
+  cudaStream_t* gpu_streams = (cudaStream_t*)v_gpu_streams;
+  uint64_t numElementsTree = MerklehashGoldilocks::getTreeNumElements(num_rows);
+  uint64_t numElementsTreeDevice = num_rows_device * CAPACITY;
+
+  init_gpu_const(ngpu);
+
+#ifdef GPU_TIMING
+  TimerStart(merkletree_cuda_multi_gpu_kernel);
+#endif
+#pragma omp parallel for num_threads(ngpu)
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    linear_hash_gpu<<<ceil(num_rows_device / (1.0 * TPB)), TPB, 0, gpu_streams[d]>>>(gpu_trees[d], gpu_inputs[d], num_cols * dim, num_rows_device);
+  }
+#ifdef GPU_TIMING
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaStreamSynchronize(gpu_streams[d]));
+  }
+  TimerStopAndLog(merkletree_cuda_multi_gpu_kernel);
+  TimerStart(merkletree_cuda_multi_gpu_copyPeer2Peer);
+#endif
+#pragma omp parallel for num_threads(ngpu)
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    CHECKCUDAERR(cudaMemcpyPeerAsync(tree + (d * numElementsTreeDevice), 0, gpu_trees[d], d, numElementsTreeDevice * sizeof(uint64_t), gpu_streams[d]));
+    // CHECKCUDAERR(cudaStreamSynchronize(gpu_streams[d]));
+  }
+#ifdef GPU_TIMING
+  TimerStopAndLog(merkletree_cuda_multi_gpu_copyPeer2Peer);
+  TimerStart(merkletree_cuda_multi_gpu_cleanup);
+#endif
+#pragma omp parallel for num_threads(ngpu)
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    CHECKCUDAERR(cudaStreamSynchronize(gpu_streams[d]));
+  }
+#ifdef GPU_TIMING
+  TimerStopAndLog(merkletree_cuda_multi_gpu_cleanup);
+#endif
+
+  // Build the merkle tree
+  CHECKCUDAERR(cudaSetDevice(0));
+  uint64_t pending = num_rows;
+  uint64_t nextN = floor((pending - 1) / 2) + 1;
+  uint64_t nextIndex = 0;
+  int actual_tpb, actual_blks;
+  while (pending > 1)
+  {
+    if (nextN < TPB)
+    {
+      actual_tpb = nextN;
+      actual_blks = 1;
+    }
+    else
+    {
+      actual_tpb = TPB;
+      actual_blks = nextN / TPB + 1;
+    }
+    hash_gpu<<<actual_blks, actual_tpb>>>(nextN, nextIndex, pending, tree);
+    nextIndex += pending * CAPACITY;
+    pending = pending / 2;
+    nextN = floor((pending - 1) / 2) + 1;
+  }
+}
+
 void PoseidonGoldilocks::merkletree_cuda(Goldilocks::Element *tree, Goldilocks::Element *input, uint64_t num_cols, uint64_t num_rows, int nThreads, uint64_t dim)
 {
     if (num_rows == 0)
