@@ -2191,7 +2191,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
 #endif
 }
 
-void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_unified_memory(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, bool buildMerkleTree)
+void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, bool buildMerkleTree)
 {
   if (ncols == 0 || size == 0)
   {

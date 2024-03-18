@@ -208,6 +208,8 @@ public:
 
     void LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool buildMerkleTree = true);
 
+    void LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool buildMerkleTree = true);
+
     void LDE_MerkleTree_MultiGPU_v3_viaCPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool buildMerkleTree = true);
 
     void LDE_MerkleTree_MultiGPU_v4(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer = NULL, u_int64_t nphase = NUM_PHASES, bool buildMerkleTree = true);
