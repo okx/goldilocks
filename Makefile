@@ -90,14 +90,8 @@ runtestscpu: testscpu
 runtestsgpu: testsgpu
 	./testsgpu --gtest_filter=GOLDILOCKS_TEST.merkletree_cuda
 
-fullgpu: tests/test_poseidon.cpp $(ALLSRCS)
-	$(CXX) -D__USE_CUDA__ tests/test_poseidon.cpp $(CXXFLAGS) -mavx2 -c
-	$(CXX) src/goldilocks_base_field.cpp $(CXXFLAGS) -mavx2 -c -o goldilocks_base_field.o
-	$(CXX) utils/timer.cpp $(CXXFLAGS) -c -o timer.o
-	$(CXX) -D__USE_CUDA__ src/poseidon_goldilocks.cpp $(CXXFLAGS) -mavx2 -c -o poseidon_goldilocks.o
-	$(NVCC) -D__USE_CUDA__ -DGPU_TIMING -Iutils/ -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 $(AVXFLAG) -Xcompiler -O3 src/ntt_goldilocks.cu -arch=$(CUDA_ARCH) -dc --output-file ntt_goldilocks_gpu.o
-	$(NVCC) -D__USE_CUDA__ -DGPU_TIMING -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -O3 $(AVXFLAG) src/poseidon_goldilocks.cu -arch=$(CUDA_ARCH) -O3 -dc --output-file poseidon_goldilocks_gpu.o
-	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -O3 -o $@ test_poseidon.o timer.o goldilocks_base_field.o ntt_goldilocks_gpu.o poseidon_goldilocks.o poseidon_goldilocks_gpu.o -lgtest -lgmp
+fullgpu: $(BUILD_DIR_GPU)/tests/test_poseidon.cpp.o $(BUILD_DIR_GPU)/src/goldilocks_base_field.cpp.o  $(BUILD_DIR_GPU)/utils/timer.cpp.o  $(BUILD_DIR_GPU)/src/poseidon_goldilocks.cpp.o $(BUILD_DIR_GPU)/src/ntt_goldilocks.cu.o $(BUILD_DIR_GPU)/src/poseidon_goldilocks.cu.o
+	$(NVCC) -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -o $@ $^ -lgtest -lgmp
 
 runfullgpu: fullgpu
 	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full
