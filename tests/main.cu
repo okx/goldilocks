@@ -114,32 +114,37 @@ int test2(uint64_t* um_data) {
 int main() {
   struct timeval start, end;
 
-  uint64_t *h_data = (uint64_t*)malloc(N * sizeof(uint64_t)); // 分配ht memory
-  // 初始化host memory数据
-  for (uint64_t i = 0; i < N; ++i) {
-    h_data[i] = i;
-  }
-  gettimeofday(&start, NULL);
-  test1(h_data);
-  gettimeofday(&end, NULL);
-  long seconds = end.tv_sec - start.tv_sec;
-  long microseconds = end.tv_usec - start.tv_usec;
-  long elapsed = seconds*1000 + microseconds/1000;
-  printf("test1 elapsed: %ld ms\n", elapsed);
-
-
-  uint64_t *um_data
-  cudaMallocManaged(&um_data, N * sizeof(uint64_t));
-  // 初始化host memory数据
-  for (uint64_t i = 0; i < N; ++i) {
-    h_data[i] = i;
+  {
+    uint64_t *h_data = (uint64_t*)malloc(N * sizeof(uint64_t)); // 分配ht memory
+    // 初始化host memory数据
+    for (uint64_t i = 0; i < N; ++i) {
+      h_data[i] = i;
+    }
+    gettimeofday(&start, NULL);
+    test1(h_data);
+    gettimeofday(&end, NULL);
+    long seconds = end.tv_sec - start.tv_sec;
+    long microseconds = end.tv_usec - start.tv_usec;
+    long elapsed = seconds*1000 + microseconds/1000;
+    printf("test1 elapsed: %ld ms\n", elapsed);
+    free(h_data);
   }
 
-  gettimeofday(&start, NULL);
-  test2(h_data);
-  gettimeofday(&end, NULL);
-  long seconds = end.tv_sec - start.tv_sec;
-  long microseconds = end.tv_usec - start.tv_usec;
-  long elapsed = seconds*1000 + microseconds/1000;
-  printf("test1 elapsed: %ld ms\n", elapsed);
+  {
+    uint64_t *um_data
+        cudaMallocManaged(&um_data, N * sizeof(uint64_t));
+    // 初始化host memory数据
+    for (uint64_t i = 0; i < N; ++i) {
+      h_data[i] = i;
+    }
+
+    gettimeofday(&start, NULL);
+    test2(h_data);
+    gettimeofday(&end, NULL);
+    long seconds = end.tv_sec - start.tv_sec;
+    long microseconds = end.tv_usec - start.tv_usec;
+    long elapsed = seconds*1000 + microseconds/1000;
+    printf("test1 elapsed: %ld ms\n", elapsed);
+    cudaFree(um_data);
+  }
 }
