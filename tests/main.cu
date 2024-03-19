@@ -131,11 +131,11 @@ int main() {
   }
 
   {
-    uint64_t *um_data
-        cudaMallocManaged(&um_data, N * sizeof(uint64_t));
+    uint64_t *um_data;
+    cudaMallocManaged(&um_data, N * sizeof(uint64_t));
     // 初始化host memory数据
     for (uint64_t i = 0; i < N; ++i) {
-      h_data[i] = i;
+      um_data[i] = i;
     }
 
     gettimeofday(&start, NULL);
