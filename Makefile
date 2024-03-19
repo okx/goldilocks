@@ -78,13 +78,13 @@ testsgpu: tests/tests.cpp $(ALLSRCS)
 
 runnew:
 	$(CXX) src/goldilocks_base_field.cpp -fPIC $(OPTFLAG) -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_base_field.o
-	$(NVCC) -D__USE_CUDA__ -D__TEST__ -Xcompiler -fopenmp -Xcompiler -mavx2 -arch=$(CUDA_ARCH) $(OPTFLAG) src/ntt_goldilocks.cu -dc --output-file ntt_gpu.o
+	$(NVCC) -D__USE_CUDA__ -D__PRINT_LOG__ -D__TEST__ -Xcompiler -fopenmp -Xcompiler -mavx2 -arch=$(CUDA_ARCH) $(OPTFLAG) src/ntt_goldilocks.cu -dc --output-file ntt_gpu.o
 	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -arch=$(CUDA_ARCH) $(OPTFLAG) -o ntt goldilocks_base_field.o ntt_gpu.o -lgtest -lgmp
 	./ntt
 
 runnew2:
 	$(CXX) src/goldilocks_base_field.cpp -fPIC $(OPTFLAG) -Wall -pthread -fopenmp -mavx2 -c -o goldilocks_base_field.o
-	$(NVCC) -D__USE_CUDA__ -D__TEST2__ -Xcompiler -fopenmp -Xcompiler -mavx2 -arch=$(CUDA_ARCH) $(OPTFLAG) src/ntt_goldilocks.cu -dc --output-file ntt2_gpu.o
+	$(NVCC) -D__USE_CUDA__ -D__PRINT_LOG__ -D__TEST2__ -Xcompiler -fopenmp -Xcompiler -mavx2 -arch=$(CUDA_ARCH) $(OPTFLAG) src/ntt_goldilocks.cu -dc --output-file ntt2_gpu.o
 	$(NVCC) -D__USE_CUDA__ -Xcompiler -fopenmp -arch=$(CUDA_ARCH) $(OPTFLAG) -o ntt2 goldilocks_base_field.o ntt2_gpu.o -lgtest -lgmp
 	./ntt2
 

@@ -437,14 +437,12 @@ void extendPol_cuda(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::El
   long elapsed = seconds*1000 + microseconds/1000;
   printf("malloc elapsed: %ld ms\n", elapsed);
 
-  gettimeofday(&start, NULL);
-
   CHECKCUDAERR(cudaMemcpyAsync(d_data, src, domain_size * ncols * sizeof(gl64_t), cudaMemcpyHostToDevice, stream));
   cudaStreamSynchronize(stream);
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
   microseconds = end.tv_usec - start.tv_usec;
-  elapsed = seconds*1000 + microseconds/1000;
+  elapsed = seconds*1000 + microseconds/1000 - elapsed;
   printf("memcpy elapsed: %ld ms\n", elapsed);
 
   CHECKCUDAERR(cudaMemsetAsync(d_data + domain_size * ncols, 0, domain_size * ncols * sizeof(gl64_t), stream));
@@ -468,18 +466,14 @@ void extendPol_cuda(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::El
 
   cudaStreamSynchronize(stream);
 
-  {
-    struct timeval start, end;
-    gettimeofday(&start, NULL);
-    CHECKCUDAERR(cudaMemcpyAsync(dst, d_data, domain_size_ext * ncols * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
-    cudaFree(d_data);
+  CHECKCUDAERR(cudaMemcpyAsync(dst, d_data, domain_size_ext * ncols * sizeof(gl64_t), cudaMemcpyDeviceToHost, stream));
+  cudaFree(d_data);
 
-    gettimeofday(&end, NULL);
-    seconds = end.tv_sec - start.tv_sec;
-    microseconds = end.tv_usec - start.tv_usec;
-    elapsed = seconds*1000 + microseconds/1000;
-    printf("cudaMemcpy elapsed: %ld ms\n", elapsed);
-  }
+  gettimeofday(&end, NULL);
+  seconds = end.tv_sec - start.tv_sec;
+  microseconds = end.tv_usec - start.tv_usec;
+  elapsed = seconds*1000 + microseconds/1000 - elapsed;
+  printf("cudaMemcpy elapsed: %ld ms\n", elapsed);
 
   cudaStreamDestroy(stream);
 
@@ -509,7 +503,6 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
   long elapsed = seconds*1000 + microseconds/1000;
   printf("malloc elapsed: %ld ms\n", elapsed);
 
-  gettimeofday(&start, NULL);
   if (dst == NULL) {
     dst = src;
   } else {
@@ -521,7 +514,7 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
   microseconds = end.tv_usec - start.tv_usec;
-  elapsed = seconds*1000 + microseconds/1000;
+  elapsed = seconds*1000 + microseconds/1000 - elapsed;
   printf("memcpy elapsed: %ld ms\n", elapsed);
 
   ntt_cuda(stream, (gl64_t *)dst, log_N, ncols, true, true);
@@ -540,18 +533,14 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
 
   cudaStreamSynchronize(stream);
 
-  {
-    struct timeval start, end;
-    gettimeofday(&start, NULL);
-    CHECKCUDAERR(cudaMemPrefetchAsync((void*)dst, domain_size * ncols * sizeof(gl64_t), cudaCpuDeviceId));
+  CHECKCUDAERR(cudaMemPrefetchAsync((void*)dst, domain_size * ncols * sizeof(gl64_t), cudaCpuDeviceId));
 
-    gettimeofday(&end, NULL);
-    seconds = end.tv_sec - start.tv_sec;
-    microseconds = end.tv_usec - start.tv_usec;
-    elapsed = seconds*1000 + microseconds/1000;
-    printf("cudaMemcpy elapsed: %ld ms\n", elapsed);
-    cudaStreamSynchronize(stream);
-  }
+  gettimeofday(&end, NULL);
+  seconds = end.tv_sec - start.tv_sec;
+  microseconds = end.tv_usec - start.tv_usec;
+  elapsed = seconds*1000 + microseconds/1000 -elapsed;
+  printf("cudaMemcpy elapsed: %ld ms\n", elapsed);
+  cudaStreamSynchronize(stream);
 
   cudaStreamDestroy(stream);
 
@@ -591,7 +580,7 @@ int main() {
   printf("[");
   for (uint j = 0; j < 2*domain_size * ncols && j<8; j++)
   {
-    printf("%lu, ", b[j]);
+    printf("%lu, ", b[2*domain_size * ncols - 1 - j]);
   }
   printf("]\n");
 #endif
@@ -632,7 +621,7 @@ int main() {
   printf("[");
   for (uint j = 0; j < 2*domain_size * ncols && j<8; j++)
   {
-    printf("%lu, ", b[j]);
+    printf("%lu, ", b[2*domain_size * ncols - 1 - j]);
   }
   printf("]\n");
 #endif
