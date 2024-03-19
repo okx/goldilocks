@@ -144,7 +144,7 @@ int main() {
     long seconds = end.tv_sec - start.tv_sec;
     long microseconds = end.tv_usec - start.tv_usec;
     long elapsed = seconds*1000 + microseconds/1000;
-    printf("test1 elapsed: %ld ms\n", elapsed);
+    printf("test2 elapsed: %ld ms\n", elapsed);
     cudaFree(um_data);
   }
 }

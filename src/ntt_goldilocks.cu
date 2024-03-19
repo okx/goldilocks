@@ -497,6 +497,9 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
+  CHECKCUDAERR(cudaMemPrefetchAsync((void*)src, domain_size * ncols * sizeof(gl64_t), cudaCpuDeviceId, stream));
+  CHECKCUDAERR(cudaMemPrefetchAsync((void*)dst, domain_size * ncols * sizeof(gl64_t), cudaCpuDeviceId, stream));
+  cudaStreamSynchronize(stream);
   gettimeofday(&end, NULL);
   long seconds = end.tv_sec - start.tv_sec;
   long microseconds = end.tv_usec - start.tv_usec;
@@ -534,13 +537,12 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
   cudaStreamSynchronize(stream);
 
   CHECKCUDAERR(cudaMemPrefetchAsync((void*)dst, domain_size * ncols * sizeof(gl64_t), cudaCpuDeviceId, stream));
-
+  cudaStreamSynchronize(stream);
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
   microseconds = end.tv_usec - start.tv_usec;
   elapsed = seconds*1000 + microseconds/1000 -elapsed;
   printf("cudaMemcpy elapsed: %ld ms\n", elapsed);
-  cudaStreamSynchronize(stream);
 
   cudaStreamDestroy(stream);
 
