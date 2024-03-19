@@ -533,7 +533,7 @@ void extendPol_cuda2(uint32_t device_id, Goldilocks::Element *dst, Goldilocks::E
 
   cudaStreamSynchronize(stream);
 
-  CHECKCUDAERR(cudaMemPrefetchAsync((void*)dst, domain_size * ncols * sizeof(gl64_t), cudaCpuDeviceId));
+  CHECKCUDAERR(cudaMemPrefetchAsync((void*)dst, domain_size * ncols * sizeof(gl64_t), cudaCpuDeviceId, stream));
 
   gettimeofday(&end, NULL);
   seconds = end.tv_sec - start.tv_sec;
