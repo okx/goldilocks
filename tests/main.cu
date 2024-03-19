@@ -139,7 +139,7 @@ int main() {
     }
 
     gettimeofday(&start, NULL);
-    test2(h_data);
+    test2(um_data);
     gettimeofday(&end, NULL);
     long seconds = end.tv_sec - start.tv_sec;
     long microseconds = end.tv_usec - start.tv_usec;
