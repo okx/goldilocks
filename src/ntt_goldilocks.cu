@@ -2417,7 +2417,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Gol
     CHECKCUDAERR(cudaSetDevice(d));
     CHECKCUDAERR(cudaStreamDestroy(gpu_stream[d]));
     CHECKCUDAERR(cudaStreamDestroy(gpu_stream[nDevices + d]));
-    CHECKCUDAERR(cudaFree(gpu_a[d]));
+    //CHECKCUDAERR(cudaFree(gpu_a[d]));
     CHECKCUDAERR(cudaFree(gpu_a2[d]));
     if (buffer == NULL)
     {
