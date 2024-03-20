@@ -2223,7 +2223,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Gol
   {
     CHECKCUDAERR(cudaSetDevice(d));
     CHECKCUDAERR(cudaStreamCreate(gpu_stream + d));
-    CHECKCUDAERR(cudaStreamCreate(gpu_stream + nDevices + d));
+    //CHECKCUDAERR(cudaStreamCreate(gpu_stream + nDevices + d));
     CHECKCUDAERR(cudaMalloc(&gpu_r_[d], ext_size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMalloc(&gpu_forward_twiddle_factors[d], ext_size * sizeof(uint64_t)));
     CHECKCUDAERR(cudaMalloc(&gpu_inverse_twiddle_factors[d], ext_size * sizeof(uint64_t)));
@@ -2388,15 +2388,16 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Gol
 #pragma omp parallel for num_threads(nDevices)
   for (uint32_t d = 0; d < nDevices; d++)
   {
-    CHECKCUDAERR(cudaSetDevice(d));
-    CHECKCUDAERR(cudaStreamDestroy(gpu_stream[d]));
-    CHECKCUDAERR(cudaStreamDestroy(gpu_stream[nDevices + d]));
-    //CHECKCUDAERR(cudaFree(gpu_a[d]));
-    CHECKCUDAERR(cudaFree(gpu_a2[d]));
-    if (buffer == NULL)
-    {
-      cudaFree(aux[d]);
-    }
+//    CHECKCUDAERR(cudaSetDevice(d));
+//    CHECKCUDAERR(cudaStreamDestroy(gpu_stream[d]));
+//    //CHECKCUDAERR(cudaStreamDestroy(gpu_stream[nDevices + d]));
+//    //CHECKCUDAERR(cudaFree(gpu_a[d]));
+//    CHECKCUDAERR(cudaFree(gpu_a2[d]));
+//    if (buffer == NULL)
+//    {
+//      printf("cudaFree aux\n");
+//      cudaFree(aux[d]);
+//    }
   }
 #ifdef GPU_TIMING
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_Cleanup);
