@@ -123,9 +123,9 @@ TEST(GOLDILOCKS_TEST, full_um)
     printf("%lu\n", Goldilocks::toU64(b[i]));
   }
 
-  cudaFree(a);
-  cudaFree(b);
-  cudaFree(c);
+//  cudaFree(a);
+//  cudaFree(b);
+//  cudaFree(c);
 }
 
 TEST(GOLDILOCKS_TEST, full_cpu)
