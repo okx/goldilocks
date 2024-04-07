@@ -23,11 +23,15 @@ ASFLAGS := -felf64
 CC := gcc
 NVCC := /usr/local/cuda/bin/nvcc
 
+OPTFLAG :=
+
 # Debug build flags
 ifeq ($(dbg),1)
       CXXFLAGS += -g
+      OPTFLAG += -g
 else
       CXXFLAGS += -O3
+      OPTFLAG += -O3
 endif
 
 ### Establish the operating system name
@@ -65,7 +69,7 @@ $(BUILD_DIR_GPU)/%.cpp.o: %.cpp
 
 $(BUILD_DIR_GPU)/%.cu.o: %.cu
 	$(MKDIR_P) $(dir $@)
-	$(NVCC) -D__USE_CUDA__ -DGPU_TIMING -Iutils -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 -arch=$(CUDA_ARCH) -dc $< --output-file $@
+	$(NVCC) -D__USE_CUDA__ -DGPU_TIMING $(OPTFLAG) -Iutils -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler -mavx2 -arch=$(CUDA_ARCH) -dc $< --output-file $@
 
 .PHONY: clean
 
@@ -94,10 +98,19 @@ fullgpu: $(BUILD_DIR_GPU)/tests/test_poseidon.cu.o $(BUILD_DIR_GPU)/src/goldiloc
 	$(NVCC) -DGPU_TIMING -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -o $@ $^ -lgtest -lgmp
 
 runfullgpu: fullgpu
-	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full
+	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full0
+
+runfullgpuv: fullgpu
+	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full1
+
+runfullgpu2: fullgpu
+	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full2
 
 runfullum: fullgpu
 	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full_um
+
+runfullum2: fullgpu
+	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full_um2
 
 runfullcpu: fullgpu
 	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full_cpu

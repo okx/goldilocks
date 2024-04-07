@@ -3,6 +3,7 @@
 #include "../src/poseidon_goldilocks.hpp"
 #include "../src/ntt_goldilocks.hpp"
 #include "../utils/timer.hpp"
+#include "cuda_utils.cuh"
 
 TEST(GOLDILOCKS_TEST, avx_op)
 {
@@ -48,14 +49,15 @@ TEST(GOLDILOCKS_TEST, avx_op)
 
 #define FFT_SIZE (1 << 23)
 #define BLOWUP_FACTOR 1
-#define NUM_COLUMNS 83
+#define NUM_COLUMNS 283
 
 #ifdef __USE_CUDA__
-TEST(GOLDILOCKS_TEST, full)
+TEST(GOLDILOCKS_TEST, full0)
 {
-  Goldilocks::Element *a = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
-  Goldilocks::Element *b = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
-  Goldilocks::Element *c = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+  uint64_t size = (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS;
+  Goldilocks::Element *a = (Goldilocks::Element *)malloc(size * sizeof(Goldilocks::Element));
+  Goldilocks::Element *b = (Goldilocks::Element *)malloc(size * sizeof(Goldilocks::Element));
+  Goldilocks::Element *c = (Goldilocks::Element *)malloc(size * sizeof(Goldilocks::Element));
 
   NTT_Goldilocks ntt(FFT_SIZE);
 
@@ -79,8 +81,102 @@ TEST(GOLDILOCKS_TEST, full)
   ntt.LDE_MerkleTree_MultiGPU_v3(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
 
-  for (uint64_t i = 0; i < 8; i++) {
+  for (uint64_t i = 0; i < 4; i++) {
     printf("%lu\n", Goldilocks::toU64(b[i]));
+    printf("%lu\n", Goldilocks::toU64(b[size-1-i]));
+  }
+  printf("\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(c[i]));
+    printf("%lu\n", Goldilocks::toU64(c[size-1-i]));
+  }
+
+  free(a);
+  free(b);
+  free(c);
+}
+
+TEST(GOLDILOCKS_TEST, full1)
+{
+  uint64_t size = (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS;
+  Goldilocks::Element *a = (Goldilocks::Element *)malloc(size * sizeof(Goldilocks::Element));
+  Goldilocks::Element *b = (Goldilocks::Element *)malloc(size * sizeof(Goldilocks::Element));
+  Goldilocks::Element *c = (Goldilocks::Element *)malloc(size * sizeof(Goldilocks::Element));
+
+  NTT_Goldilocks ntt(FFT_SIZE);
+
+  for (uint i = 0; i < 2; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      Goldilocks::add(a[i * NUM_COLUMNS + j], Goldilocks::one(), Goldilocks::fromU64(j));
+    }
+  }
+
+  for (uint64_t i = 2; i < FFT_SIZE; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      a[i * NUM_COLUMNS + j] = a[NUM_COLUMNS * (i - 1) + j] + a[NUM_COLUMNS * (i - 2) + j];
+    }
+  }
+
+  TimerStart(LDE_MerkleTree_MultiGPU_v3);
+  ntt.LDE_MerkleTree_MultiGPU_v3_viaCPU(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
+  TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
+
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(b[i]));
+    printf("%lu\n", Goldilocks::toU64(b[size-1-i]));
+  }
+  printf("\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(c[i]));
+    printf("%lu\n", Goldilocks::toU64(c[size-1-i]));
+  }
+
+  free(a);
+  free(b);
+  free(c);
+}
+
+TEST(GOLDILOCKS_TEST, full2)
+{
+  uint64_t size = (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS;
+  Goldilocks::Element *a = (Goldilocks::Element *)malloc(size * sizeof(Goldilocks::Element));
+  Goldilocks::Element *b = (Goldilocks::Element *)malloc(size * sizeof(Goldilocks::Element));
+  Goldilocks::Element *c = (Goldilocks::Element *)malloc(size * sizeof(Goldilocks::Element));
+
+  NTT_Goldilocks ntt(FFT_SIZE);
+
+  for (uint i = 0; i < 2; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      Goldilocks::add(a[i * NUM_COLUMNS + j], Goldilocks::one(), Goldilocks::fromU64(j));
+    }
+  }
+
+  for (uint64_t i = 2; i < FFT_SIZE; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      a[i * NUM_COLUMNS + j] = a[NUM_COLUMNS * (i - 1) + j] + a[NUM_COLUMNS * (i - 2) + j];
+    }
+  }
+
+  TimerStart(LDE_MerkleTree_MultiGPU_v3);
+  ntt.LDE_MerkleTree_MultiGPU_v5(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
+  TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
+
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(b[i]));
+    printf("%lu\n", Goldilocks::toU64(b[size-1-i]));
+  }
+  printf("\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(c[i]));
+    printf("%lu\n", Goldilocks::toU64(c[size-1-i]));
   }
 
   free(a);
@@ -90,12 +186,13 @@ TEST(GOLDILOCKS_TEST, full)
 
 TEST(GOLDILOCKS_TEST, full_um)
 {
+  uint64_t size = (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS;
   Goldilocks::Element *a;
   Goldilocks::Element *b;
   Goldilocks::Element *c;
-  cudaMallocManaged(&a, (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
-  cudaMallocManaged(&b, (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
-  cudaMallocManaged(&c, (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+  cudaMallocManaged(&a, size * sizeof(Goldilocks::Element));
+  cudaMallocManaged(&b, size * sizeof(Goldilocks::Element));
+  cudaMallocManaged(&c, size * sizeof(Goldilocks::Element));
 
   NTT_Goldilocks ntt(FFT_SIZE);
 
@@ -119,13 +216,108 @@ TEST(GOLDILOCKS_TEST, full_um)
   ntt.LDE_MerkleTree_MultiGPU_v3_um(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3_um);
 
-  for (uint64_t i = 0; i < 8; i++) {
+  for (uint64_t i = 0; i < 4; i++) {
     printf("%lu\n", Goldilocks::toU64(b[i]));
+    printf("%lu\n", Goldilocks::toU64(b[size-1-i]));
+  }
+  printf("\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(c[i]));
+    printf("%lu\n", Goldilocks::toU64(c[size-1-i]));
   }
 
-//  cudaFree(a);
-//  cudaFree(b);
-//  cudaFree(c);
+  int nDevices = 0;
+  CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
+#pragma omp parallel for num_threads(nDevices)
+  for (uint32_t d = 0; d < nDevices; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    size_t free_mem, total_mem;
+    CHECKCUDAERR(cudaMemGetInfo(&free_mem, &total_mem));
+    printf("device %u, total mem: %zu MB, free_mem: %zu MB\n", d, total_mem>>20, free_mem>>20);
+  }
+
+  cudaFree(a);
+  cudaFree(b);
+  cudaFree(c);
+
+#pragma omp parallel for num_threads(nDevices)
+  for (uint32_t d = 0; d < nDevices; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    size_t free_mem, total_mem;
+    CHECKCUDAERR(cudaMemGetInfo(&free_mem, &total_mem));
+    printf("device %u, total mem: %zu MB, free_mem: %zu MB\n", d, total_mem>>20, free_mem>>20);
+  }
+
+}
+
+TEST(GOLDILOCKS_TEST, full_um2)
+{
+  uint64_t size = (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS;
+  Goldilocks::Element *a;
+  Goldilocks::Element *b;
+  Goldilocks::Element *c;
+  cudaMallocManaged(&a, size * sizeof(Goldilocks::Element));
+  cudaMallocManaged(&b, size * sizeof(Goldilocks::Element));
+  cudaMallocManaged(&c, size * sizeof(Goldilocks::Element));
+
+  NTT_Goldilocks ntt(FFT_SIZE);
+
+  for (uint i = 0; i < 2; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      Goldilocks::add(a[i * NUM_COLUMNS + j], Goldilocks::one(), Goldilocks::fromU64(j));
+    }
+  }
+
+  for (uint64_t i = 2; i < FFT_SIZE; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      a[i * NUM_COLUMNS + j] = a[NUM_COLUMNS * (i - 1) + j] + a[NUM_COLUMNS * (i - 2) + j];
+    }
+  }
+
+  TimerStart(LDE_MerkleTree_MultiGPU_v3_um);
+  ntt.LDE_MerkleTree_MultiGPU_v3_um2(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
+  TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3_um);
+
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(b[i]));
+    printf("%lu\n", Goldilocks::toU64(b[size-1-i]));
+  }
+  printf("\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(c[i]));
+    printf("%lu\n", Goldilocks::toU64(c[size-1-i]));
+  }
+
+  int nDevices = 0;
+  CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
+#pragma omp parallel for num_threads(nDevices)
+  for (uint32_t d = 0; d < nDevices; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    size_t free_mem, total_mem;
+    CHECKCUDAERR(cudaMemGetInfo(&free_mem, &total_mem));
+    printf("device %u, total mem: %zu MB, free_mem: %zu MB\n", d, total_mem>>20, free_mem>>20);
+  }
+
+  cudaFree(a);
+  cudaFree(b);
+  cudaFree(c);
+
+#pragma omp parallel for num_threads(nDevices)
+  for (uint32_t d = 0; d < nDevices; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    size_t free_mem, total_mem;
+    CHECKCUDAERR(cudaMemGetInfo(&free_mem, &total_mem));
+    printf("device %u, total mem: %zu MB, free_mem: %zu MB\n", d, total_mem>>20, free_mem>>20);
+  }
+
 }
 
 TEST(GOLDILOCKS_TEST, full_cpu)

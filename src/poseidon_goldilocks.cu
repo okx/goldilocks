@@ -208,6 +208,61 @@ __device__ void linear_hash_one(gl64_t *output, gl64_t *input, uint32_t size, in
     mymemcpy((uint64_t*)output, (uint64_t*)state, CAPACITY);
 }
 
+#include <assert.h>
+__device__ void linear_hash_one2(gl64_t *output, gl64_t *input, uint32_t size, uint32_t batch_size, uint32_t num_rows, int tid)
+{
+  u32 remaining = size;
+  __shared__ gl64_t GPU_C_SM[118];
+  __shared__ gl64_t GPU_S_SM[507];
+  __shared__ gl64_t GPU_M_SM[144];
+  __shared__ gl64_t GPU_P_SM[144];
+
+  if (tid == 0)
+  {
+    mymemcpy((uint64_t*)GPU_C_SM, GPU_C, 118);
+    mymemcpy((uint64_t*)GPU_S_SM, GPU_S, 507);
+    mymemcpy((uint64_t*)GPU_M_SM, GPU_M, 144);
+    mymemcpy((uint64_t*)GPU_P_SM, GPU_P, 144);
+  }
+  __syncthreads();
+
+  gl64_t state[SPONGE_WIDTH];
+
+
+  if (size <= CAPACITY)
+  {
+    mymemcpy((uint64_t*)output, (uint64_t*)input, size);
+    mymemset((uint64_t*)&output[size], 0, (CAPACITY - size));
+    return; // no need to hash
+  }
+  u32 processed = 0;
+  while (remaining)
+  {
+    if (remaining == size)
+    {
+      mymemset((uint64_t*)(state + RATE), 0, CAPACITY);
+    }
+    else
+    {
+      mymemcpy((uint64_t*)(state + RATE), (uint64_t*)state, CAPACITY);
+    }
+
+    u32 n = (remaining < RATE) ? remaining : RATE;
+    mymemset((uint64_t*)&state[n], 0, (RATE - n));
+    if (processed >= batch_size) {
+        assert(processed == batch_size);
+        processed = 0;
+        input = input + batch_size * (num_rows - 1);
+    }
+    mymemcpy((uint64_t*)state, (uint64_t*)input, n);
+    hash_full_result_seq(state, state, GPU_C_SM, GPU_S_SM, GPU_M_SM, GPU_P_SM);
+    remaining -= n;
+    processed += n;
+    input = input + n;
+  }
+  mymemcpy((uint64_t*)output, (uint64_t*)state, CAPACITY);
+}
+
 __device__ void linear_partial_hash_one(gl64_t *input, uint32_t size, gl64_t *state, int tid)
 {
     __shared__ gl64_t GPU_C_SM[118];
@@ -246,6 +301,17 @@ __global__ void linear_hash_gpu(uint64_t *output, uint64_t *input, uint32_t size
     gl64_t *inp = (gl64_t *)(input + tid * size);
     gl64_t *out = (gl64_t *)(output + tid * CAPACITY);
     linear_hash_one(out, inp, size, threadIdx.x);
+}
+
+__global__ void linear_hash_gpu2(uint64_t *output, uint64_t *input, uint32_t size, uint32_t batch_size, uint32_t num_rows)
+{
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tid >= num_rows)
+    return;
+
+  gl64_t *inp = (gl64_t *)(input + tid * batch_size);
+  gl64_t *out = (gl64_t *)(output + tid * CAPACITY);
+  linear_hash_one2(out, inp, size, batch_size, num_rows, threadIdx.x);
 }
 
 __global__ void linear_partial_init_hash_gpu(uint64_t *gstate, int32_t num_rows)
@@ -567,6 +633,76 @@ void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full(Goldilocks::Element *tre
     CHECKCUDAERR(cudaFree(gpu_final_tree));
 }
 
+void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full2(Goldilocks::Element *tree, uint64_t** gpu_inputs, uint64_t** gpu_trees, void* v_gpu_streams, uint64_t num_cols, uint64_t num_cols_device, uint64_t num_rows, uint64_t num_rows_device, uint32_t const ngpu, uint64_t dim)
+{
+  cudaStream_t* gpu_streams = (cudaStream_t*)v_gpu_streams;
+  uint64_t numElementsTree = MerklehashGoldilocks::getTreeNumElements(num_rows);
+  uint64_t numElementsTreeDevice = num_rows_device * CAPACITY;
+
+  uint64_t* gpu_final_tree;
+  CHECKCUDAERR(cudaSetDevice(0));
+  CHECKCUDAERR(cudaMalloc(&gpu_final_tree, numElementsTree * sizeof(uint64_t)));
+
+  init_gpu_const(ngpu);
+
+#ifdef GPU_TIMING
+  TimerStart(merkletree_cuda_multi_gpu_kernel);
+#endif
+#pragma omp parallel for num_threads(ngpu)
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    linear_hash_gpu2<<<ceil(num_rows_device / (1.0 * TPB)), TPB, 0, gpu_streams[d]>>>(gpu_trees[d], gpu_inputs[d], num_cols * dim, num_cols_device, num_rows_device);
+  }
+#ifdef GPU_TIMING
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaStreamSynchronize(gpu_streams[d]));
+  }
+  TimerStopAndLog(merkletree_cuda_multi_gpu_kernel);
+  TimerStart(merkletree_cuda_multi_gpu_copyPeer2Peer);
+#endif
+#pragma omp parallel for num_threads(ngpu)
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    CHECKCUDAERR(cudaMemcpyPeerAsync(gpu_final_tree + (d * numElementsTreeDevice), 0, gpu_trees[d], d, numElementsTreeDevice * sizeof(uint64_t), gpu_streams[d]));
+  }
+#ifdef GPU_TIMING
+  for (uint32_t d = 0; d < ngpu; d++) {
+    CHECKCUDAERR(cudaStreamSynchronize(gpu_streams[d]));
+  }
+  TimerStopAndLog(merkletree_cuda_multi_gpu_copyPeer2Peer);
+#endif
+
+
+  // Build the merkle tree
+  CHECKCUDAERR(cudaSetDevice(0));
+  uint64_t pending = num_rows;
+  uint64_t nextN = floor((pending - 1) / 2) + 1;
+  uint64_t nextIndex = 0;
+  int actual_tpb, actual_blks;
+  while (pending > 1)
+  {
+    if (nextN < TPB)
+    {
+      actual_tpb = nextN;
+      actual_blks = 1;
+    }
+    else
+    {
+      actual_tpb = TPB;
+      actual_blks = nextN / TPB + 1;
+    }
+    hash_gpu<<<actual_blks, actual_tpb, 0, gpu_streams[0]>>>(nextN, nextIndex, pending, gpu_final_tree);
+    nextIndex += pending * CAPACITY;
+    pending = pending / 2;
+    nextN = floor((pending - 1) / 2) + 1;
+  }
+  CHECKCUDAERR(cudaMemcpyAsync(tree, gpu_final_tree, numElementsTree * sizeof(uint64_t), cudaMemcpyDeviceToHost, gpu_streams[0]));
+  //CHECKCUDAERR(cudaFree(gpu_final_tree));
+}
+
 void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full_um(Goldilocks::Element *tree, uint64_t** gpu_inputs, uint64_t** gpu_trees, void* v_gpu_streams, uint64_t num_cols, uint64_t num_rows, uint64_t num_rows_device, uint32_t const ngpu, uint64_t dim)
 {
   cudaStream_t* gpu_streams = (cudaStream_t*)v_gpu_streams;
@@ -583,6 +719,77 @@ void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full_um(Goldilocks::Element *
   {
     CHECKCUDAERR(cudaSetDevice(d));
     linear_hash_gpu<<<ceil(num_rows_device / (1.0 * TPB)), TPB, 0, gpu_streams[d]>>>(gpu_trees[d], gpu_inputs[d], num_cols * dim, num_rows_device);
+  }
+#ifdef GPU_TIMING
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaStreamSynchronize(gpu_streams[d]));
+  }
+  TimerStopAndLog(merkletree_cuda_multi_gpu_kernel);
+  TimerStart(merkletree_cuda_multi_gpu_copyPeer2Peer);
+#endif
+#pragma omp parallel for num_threads(ngpu)
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    CHECKCUDAERR(cudaMemcpyPeerAsync(tree + (d * numElementsTreeDevice), 0, gpu_trees[d], d, numElementsTreeDevice * sizeof(uint64_t), gpu_streams[d]));
+    // CHECKCUDAERR(cudaStreamSynchronize(gpu_streams[d]));
+  }
+#ifdef GPU_TIMING
+  TimerStopAndLog(merkletree_cuda_multi_gpu_copyPeer2Peer);
+  TimerStart(merkletree_cuda_multi_gpu_cleanup);
+#endif
+#pragma omp parallel for num_threads(ngpu)
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    CHECKCUDAERR(cudaStreamSynchronize(gpu_streams[d]));
+  }
+#ifdef GPU_TIMING
+  TimerStopAndLog(merkletree_cuda_multi_gpu_cleanup);
+#endif
+
+  // Build the merkle tree
+  CHECKCUDAERR(cudaSetDevice(0));
+  uint64_t pending = num_rows;
+  uint64_t nextN = floor((pending - 1) / 2) + 1;
+  uint64_t nextIndex = 0;
+  int actual_tpb, actual_blks;
+  while (pending > 1)
+  {
+    if (nextN < TPB)
+    {
+      actual_tpb = nextN;
+      actual_blks = 1;
+    }
+    else
+    {
+      actual_tpb = TPB;
+      actual_blks = nextN / TPB + 1;
+    }
+    hash_gpu<<<actual_blks, actual_tpb>>>(nextN, nextIndex, pending, (uint64_t *)tree);
+    nextIndex += pending * CAPACITY;
+    pending = pending / 2;
+    nextN = floor((pending - 1) / 2) + 1;
+  }
+}
+
+void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full_um2(Goldilocks::Element *tree, uint64_t** gpu_inputs, uint64_t** gpu_trees, void* v_gpu_streams, uint64_t num_cols, uint64_t num_cols_device, uint64_t num_rows, uint64_t num_rows_device, uint32_t const ngpu, uint64_t dim)
+{
+  cudaStream_t* gpu_streams = (cudaStream_t*)v_gpu_streams;
+  uint64_t numElementsTree = MerklehashGoldilocks::getTreeNumElements(num_rows);
+  uint64_t numElementsTreeDevice = num_rows_device * CAPACITY;
+
+  init_gpu_const(ngpu);
+
+#ifdef GPU_TIMING
+  TimerStart(merkletree_cuda_multi_gpu_kernel);
+#endif
+#pragma omp parallel for num_threads(ngpu)
+  for (uint32_t d = 0; d < ngpu; d++)
+  {
+    CHECKCUDAERR(cudaSetDevice(d));
+    linear_hash_gpu2<<<ceil(num_rows_device / (1.0 * TPB)), TPB, 0, gpu_streams[d]>>>(gpu_trees[d], gpu_inputs[d], num_cols * dim, num_cols_device, num_rows_device);
   }
 #ifdef GPU_TIMING
   for (uint32_t d = 0; d < ngpu; d++)
