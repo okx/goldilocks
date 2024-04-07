@@ -48,7 +48,7 @@ TEST(GOLDILOCKS_TEST, avx_op)
 
 #define FFT_SIZE (1 << 23)
 #define BLOWUP_FACTOR 1
-#define NUM_COLUMNS 83
+#define NUM_COLUMNS 283
 
 #ifdef __USE_CUDA__
 TEST(GOLDILOCKS_TEST, full)
@@ -79,8 +79,15 @@ TEST(GOLDILOCKS_TEST, full)
   ntt.LDE_MerkleTree_MultiGPU_v3(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
 
-  for (uint64_t i = 0; i < 8; i++) {
+  printf("dst:\n");
+  for (uint64_t i = 0; i < 4; i++) {
     printf("%lu\n", Goldilocks::toU64(b[i]));
+    printf("%lu\n", Goldilocks::toU64(b[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
+  }
+  printf("buffer:\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(c[i]));
+    printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
   }
 
   free(a);
@@ -119,13 +126,20 @@ TEST(GOLDILOCKS_TEST, full_um)
   ntt.LDE_MerkleTree_MultiGPU_v3_um(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3_um);
 
-  for (uint64_t i = 0; i < 8; i++) {
+  printf("dst:\n");
+  for (uint64_t i = 0; i < 4; i++) {
     printf("%lu\n", Goldilocks::toU64(b[i]));
+    printf("%lu\n", Goldilocks::toU64(b[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
+  }
+  printf("buffer:\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(c[i]));
+    printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
   }
 
-//  cudaFree(a);
-//  cudaFree(b);
-//  cudaFree(c);
+  cudaFree(a);
+  cudaFree(b);
+  cudaFree(c);
 }
 
 TEST(GOLDILOCKS_TEST, full_cpu)
