@@ -2120,19 +2120,6 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
             CHECKCUDAERR(cudaMalloc(&gpu_a2[d], 4 * nrows_per_gpu * sizeof(uint64_t)));
         }
 
-// sync memcpy
-/*
-        if (buffer != NULL)
-        {
-#pragma omp parallel for num_threads(nDevices)
-            for (uint32_t d = 0; d < nDevices; d++)
-            {
-                CHECKCUDAERR(cudaSetDevice(d));
-                CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[nDevices + d]));
-            }
-        }
-*/
-
 #ifdef GPU_TIMING
         TimerStopAndLog(LDE_MerkleTree_MultiGPU_MerkleTree_Transpose);
         TimerStart(LDE_MerkleTree_MultiGPU_MerkleTree_Kernel);
@@ -2204,7 +2191,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Gol
   uint64_t ncols_last_gpu = ncols - ncols_per_gpu * (nDevices - 1);
   uint64_t aux_ext_size = ext_size * ncols_per_gpu;
 
-  printf("*** In LDE_MerkleTree_MultiGPU_v3() ...\n");
+  printf("*** In LDE_MerkleTree_MultiGPU_v3_um() ...\n");
   printf("Number of CPU threads: %d\n", nThreads);
   printf("Number of GPUs: %d\n", nDevices);
   printf("Number columns: %lu\n", ncols);
@@ -2351,24 +2338,14 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Gol
       CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
     }
 
-    printf("aux:\n");
-    for (uint32_t d = 0; d < nDevices; d++) {
-      for (uint64_t i = 0; i < 2; i++) {
-        printf("%lu\n", Goldilocks::toU64(aux[d][nrows_per_gpu * ncols -1 -i]));
-      }
-      printf("\n");
-    }
-
-
-//    if (buffer != NULL)
-//    {
-//#pragma omp parallel for num_threads(nDevices)
-//      for (uint64_t d = 0; d < nDevices; d++)
-//      {
-//        CHECKCUDAERR(cudaSetDevice(d));
-//        CHECKCUDAERR(cudaMemcpyAsync(buffer + d * (nrows_per_gpu * ncols), gpu_a[d], nrows_per_gpu * ncols * sizeof(uint64_t), cudaMemcpyDeviceToHost, gpu_stream[nDevices + d]));
+//    printf("aux:\n");
+//    for (uint32_t d = 0; d < nDevices; d++) {
+//      for (uint64_t i = 0; i < 2; i++) {
+//        printf("%lu\n", Goldilocks::toU64(aux[d][nrows_per_gpu * ncols -1 -i]));
 //      }
+//      printf("\n");
 //    }
+
 
 #pragma omp parallel for num_threads(nDevices)
     for (uint32_t d = 0; d < nDevices; d++)
@@ -2574,13 +2551,13 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_viaCPU(Goldilocks::Element *dst,
         }
         free(buffer2);
 
-        printf("aux:\n");
-        for (uint32_t d = 0; d < nDevices - 1; d++) {
-          for (uint64_t i = 0; i < 2; i++) {
-            printf("%lu\n", Goldilocks::toU64(buffer[(d + 1) * nrows_per_gpu * ncols -1 -i]));
-          }
-          printf("\n");
-        }
+//        printf("aux:\n");
+//        for (uint32_t d = 0; d < nDevices - 1; d++) {
+//          for (uint64_t i = 0; i < 2; i++) {
+//            printf("%lu\n", Goldilocks::toU64(buffer[(d + 1) * nrows_per_gpu * ncols -1 -i]));
+//          }
+//          printf("\n");
+//        }
 
 #ifdef GPU_TIMING
         TimerStopAndLog(LDE_MerkleTree_MultiGPU_MerkleTree_TransposeOnCPU);
