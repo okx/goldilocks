@@ -76,7 +76,7 @@ TEST(GOLDILOCKS_TEST, full)
   }
 
   TimerStart(LDE_MerkleTree_MultiGPU_v3);
-  ntt.LDE_MerkleTree_MultiGPU_v3(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
+  ntt.LDE_MerkleTree_MultiGPU_v3_viaCPU(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
 
   printf("dst:\n");
