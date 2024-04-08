@@ -2351,9 +2351,9 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Gol
     }
 
     printf("aux:\n");
-    for (uint32_t d = 0; d < nDevices; d++) {
-      for (uint64_t i = 0; i < 4; i++) {
-        printf("%lu\n", Goldilocks::toU64(aux[d][i]));
+    for (uint32_t d = 0; d < nDevices - 1; d++) {
+      for (uint64_t i = 0; i < 2; i++) {
+        printf("%lu\n", Goldilocks::toU64(aux[d][ext_size * ncols_per_gpu -1 -i]));
       }
       printf("\n");
     }
@@ -2574,9 +2574,9 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_viaCPU(Goldilocks::Element *dst,
         free(buffer2);
 
         printf("aux:\n");
-        for (uint32_t d = 0; d < nDevices; d++) {
-          for (uint64_t i = 0; i < 4; i++) {
-            printf("%lu\n", Goldilocks::toU64(buffer[d * nrows_per_gpu * ncols + i]));
+        for (uint32_t d = 0; d < nDevices - 1; d++) {
+          for (uint64_t i = 0; i < 2; i++) {
+            printf("%lu\n", Goldilocks::toU64(buffer[(d + 1) * nrows_per_gpu * ncols -1 -i]));
           }
           printf("\n");
         }
