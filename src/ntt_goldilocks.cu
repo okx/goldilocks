@@ -2345,15 +2345,16 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Gol
     for (uint32_t d = 0; d < nDevices; d++)
     {
       CHECKCUDAERR(cudaSetDevice(d));
+      aux[d] = buffer + d * nrows_per_gpu * ncols;
       // transpose<<<ceil(nrows_per_gpu / (1.0 * TPB_V1)), TPB_V1, 0, gpu_stream[d]>>>((uint64_t *)gpu_a[d], (uint64_t *)gpu_a2[d], nDevices, nrows_per_gpu, ncols_per_gpu, ncols_last_gpu);
       transpose_opt<<<128, ncols, 0, gpu_stream[d]>>>((uint64_t *)aux[d], (uint64_t *)gpu_a2[d], nDevices, nrows_per_gpu, ncols_per_gpu, ncols_last_gpu, nrows_per_gpu / 128);
       CHECKCUDAERR(cudaStreamSynchronize(gpu_stream[d]));
     }
 
     printf("aux:\n");
-    for (uint32_t d = 0; d < nDevices - 1; d++) {
+    for (uint32_t d = 0; d < nDevices; d++) {
       for (uint64_t i = 0; i < 2; i++) {
-        printf("%lu\n", Goldilocks::toU64(aux[d][ext_size * ncols_per_gpu -1 -i]));
+        printf("%lu\n", Goldilocks::toU64(aux[d][nrows_per_gpu * ncols -1 -i]));
       }
       printf("\n");
     }
