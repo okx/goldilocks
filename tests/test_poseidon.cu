@@ -90,9 +90,61 @@ TEST(GOLDILOCKS_TEST, full)
     printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
   }
 
+  uint64_t free, used;
+  cudaMemGetInfo(&free, &total);
+  printf("free: %lu, total: %lu\n", free, total);
+
   free(a);
   free(b);
   free(c);
+}
+
+TEST(GOLDILOCKS_TEST, full2)
+{
+  Goldilocks::Element *a = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+  Goldilocks::Element *b = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+  Goldilocks::Element *c = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+
+  NTT_Goldilocks ntt(FFT_SIZE);
+
+  for (uint i = 0; i < 2; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      Goldilocks::add(a[i * NUM_COLUMNS + j], Goldilocks::one(), Goldilocks::fromU64(j));
+    }
+  }
+
+  for (uint64_t i = 2; i < FFT_SIZE; i++)
+  {
+    for (uint j = 0; j < NUM_COLUMNS; j++)
+    {
+      a[i * NUM_COLUMNS + j] = a[NUM_COLUMNS * (i - 1) + j] + a[NUM_COLUMNS * (i - 2) + j];
+    }
+  }
+
+  TimerStart(LDE_MerkleTree_MultiGPU_v3);
+  ntt.LDE_MerkleTree_MultiGPU_v3_viaCPU(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
+  TimerStopAndLog(LDE_MerkleTree_MultiGPU_v3);
+
+  printf("dst:\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(b[i]));
+    printf("%lu\n", Goldilocks::toU64(b[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
+  }
+  printf("buffer:\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(c[i]));
+    printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
+  }
+
+  uint64_t free, used;
+  cudaMemGetInfo(&free, &total);
+  printf("free: %lu, total: %lu\n", free, total);
+
+  cudaFree(a);
+  cudaFree(b);
+  cudaFree(c);
 }
 
 TEST(GOLDILOCKS_TEST, full_um)

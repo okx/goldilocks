@@ -96,6 +96,9 @@ fullgpu: $(BUILD_DIR_GPU)/tests/test_poseidon.cu.o $(BUILD_DIR_GPU)/src/goldiloc
 runfullgpu: fullgpu
 	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full
 
+runfullgpu2: fullgpu
+	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full2
+
 runfullum: fullgpu
 	./fullgpu --gtest_filter=GOLDILOCKS_TEST.full_um
 
