@@ -3,6 +3,7 @@
 #include "../src/poseidon_goldilocks.hpp"
 #include "../src/ntt_goldilocks.hpp"
 #include "../utils/timer.hpp"
+#include "../utils/cuda_utils.cuh"
 
 TEST(GOLDILOCKS_TEST, avx_op)
 {
@@ -190,15 +191,30 @@ TEST(GOLDILOCKS_TEST, full_um)
     printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
   }
 
-//  cudaStream_t *ss;
-//  cudaSetDevice(0);
-//  CHECKCUDAERR(cudaStreamCreate(&ss));
-//  cudaMemPrefetchAsync(c, nrows_per_gpu * ncols, cudaCpuDeviceId, gpu_stream[d + nDevices])
-
-
   uint64_t free_mem, total_mem;
   cudaMemGetInfo(&free_mem, &total_mem);
   printf("1. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
+  cudaStream_t *ss;
+  cudaSetDevice(0);
+  CHECKCUDAERR(cudaStreamCreate(&ss));
+
+  CHECKCUDAERR(cudaMemPrefetchAsync(a, DATA_SIZE * sizeof(uint64_t), cudaCpuDeviceId, ss));
+  CHECKCUDAERR(cudaStreamSynchronize(ss));
+  cudaMemGetInfo(&free_mem, &total_mem);
+  printf("11. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
+
+  CHECKCUDAERR(cudaMemPrefetchAsync(b, DATA_SIZE * sizeof(uint64_t), cudaCpuDeviceId, ss));
+  CHECKCUDAERR(cudaStreamSynchronize(ss));
+  cudaMemGetInfo(&free_mem, &total_mem);
+  printf("12. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
+
+  CHECKCUDAERR(cudaMemPrefetchAsync(c, DATA_SIZE * sizeof(uint64_t), cudaCpuDeviceId, ss));
+  CHECKCUDAERR(cudaStreamSynchronize(ss));
+  cudaMemGetInfo(&free_mem, &total_mem);
+  printf("13. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
+
+
+
   cudaFree(a);
   cudaMemGetInfo(&free_mem, &total_mem);
   printf("2. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
