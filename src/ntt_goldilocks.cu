@@ -2203,6 +2203,9 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Gol
   printf("Cols per GPU: %lu\n", ncols_per_gpu);
   printf("Cols last GPU: %lu\n", ncols_last_gpu);
   // TODO - we suppose the GPU memory is large enough, so we do not test it
+  uint64_t free_mem, total_mem;
+  cudaMemGetInfo(&free_mem, &total_mem);
+  printf("free_mem: %lu, total_mem: %lu\n", free_mem >> 20, total_mem >> 20);
 
   int lg2 = log2(size);
   int lg2ext = log2(ext_size);
@@ -2392,6 +2395,8 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Gol
 #ifdef GPU_TIMING
   TimerStopAndLog(LDE_MerkleTree_MultiGPU_Cleanup);
 #endif
+  cudaMemGetInfo(&free_mem, &total_mem);
+  printf("free_mem: %lu, total_mem: %lu\n", free_mem >> 20, total_mem >> 20);
 }
 
 void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_viaCPU(Goldilocks::Element *dst, Goldilocks::Element *src, u_int64_t size, u_int64_t ext_size, u_int64_t ncols, Goldilocks::Element *buffer, u_int64_t nphase, bool buildMerkleTree)
