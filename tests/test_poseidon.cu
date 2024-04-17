@@ -149,12 +149,13 @@ TEST(GOLDILOCKS_TEST, full2)
 
 TEST(GOLDILOCKS_TEST, full_um)
 {
+  uint64_t DATA_SIZE = (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS;
   Goldilocks::Element *a;
   Goldilocks::Element *b;
   Goldilocks::Element *c;
-  cudaMallocManaged(&a, (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
-  cudaMallocManaged(&b, (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
-  cudaMallocManaged(&c, (uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+  cudaMallocManaged(&a, DATA_SIZE * sizeof(Goldilocks::Element));
+  cudaMallocManaged(&b, DATA_SIZE * sizeof(Goldilocks::Element));
+  cudaMallocManaged(&c, DATA_SIZE * sizeof(Goldilocks::Element));
 
   NTT_Goldilocks ntt(FFT_SIZE);
 
@@ -189,12 +190,16 @@ TEST(GOLDILOCKS_TEST, full_um)
     printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
   }
 
+//  cudaStream_t *ss;
+//  cudaSetDevice(0);
+//  CHECKCUDAERR(cudaStreamCreate(&ss));
+//  cudaMemPrefetchAsync(c, nrows_per_gpu * ncols, cudaCpuDeviceId, gpu_stream[d + nDevices])
+
+
   uint64_t free_mem, total_mem;
   cudaMemGetInfo(&free_mem, &total_mem);
   printf("1. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
-
   cudaFree(a);
-
   cudaMemGetInfo(&free_mem, &total_mem);
   printf("2. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
   cudaFree(b);
