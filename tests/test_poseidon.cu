@@ -189,9 +189,20 @@ TEST(GOLDILOCKS_TEST, full_um)
     printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
   }
 
+  uint64_t free_mem, total_mem;
+  cudaMemGetInfo(&free_mem, &total_mem);
+  printf("1. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
+
   cudaFree(a);
+
+  cudaMemGetInfo(&free_mem, &total_mem);
+  printf("2. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
   cudaFree(b);
+  cudaMemGetInfo(&free_mem, &total_mem);
+  printf("3. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
   cudaFree(c);
+  cudaMemGetInfo(&free_mem, &total_mem);
+  printf("4. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
 }
 
 TEST(GOLDILOCKS_TEST, full_cpu)
