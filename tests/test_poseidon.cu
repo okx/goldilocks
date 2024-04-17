@@ -194,7 +194,7 @@ TEST(GOLDILOCKS_TEST, full_um)
   uint64_t free_mem, total_mem;
   cudaMemGetInfo(&free_mem, &total_mem);
   printf("1. free_mem: %lu, total_mem: %lu\n", free_mem, total_mem);
-  cudaStream_t *ss;
+  cudaStream_t ss;
   cudaSetDevice(0);
   CHECKCUDAERR(cudaStreamCreate(&ss));
 
