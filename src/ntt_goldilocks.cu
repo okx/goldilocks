@@ -2383,7 +2383,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_um(Goldilocks::Element *dst, Gol
 #endif
   }
 
-  CHECKCUDAERR(cudaMemPrefetchAsync(dst, nrows_per_gpu * 4 * nDevices, cudaCpuDeviceId, gpu_stream[2*nDevices]));
+  CHECKCUDAERR(cudaMemPrefetchAsync(dst, ext_size * 4, cudaCpuDeviceId, gpu_stream[2*nDevices]));
 
 #ifdef GPU_TIMING
   TimerStart(LDE_MerkleTree_MultiGPU_Cleanup);
