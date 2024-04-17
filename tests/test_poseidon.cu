@@ -154,9 +154,9 @@ TEST(GOLDILOCKS_TEST, full_um)
   Goldilocks::Element *a;
   Goldilocks::Element *b;
   Goldilocks::Element *c;
-  cudaMallocManaged(&a, DATA_SIZE * sizeof(Goldilocks::Element));
-  cudaMallocManaged(&b, DATA_SIZE * sizeof(Goldilocks::Element));
-  cudaMallocManaged(&c, DATA_SIZE * sizeof(Goldilocks::Element));
+  cudaMallocManaged(&a, DATA_SIZE * sizeof(Goldilocks::Element), cudaMemAttachHost);
+  cudaMallocManaged(&b, DATA_SIZE * sizeof(Goldilocks::Element), cudaMemAttachHost);
+  cudaMallocManaged(&c, DATA_SIZE * sizeof(Goldilocks::Element), cudaMemAttachHost);
 
   NTT_Goldilocks ntt(FFT_SIZE);
 
