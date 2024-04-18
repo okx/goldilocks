@@ -1948,19 +1948,20 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
         return;
     }
 
+    int nDevices = 0;
+    CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
+
     uint64_t free_mem, total_mem;
     cudaMemGetInfo(&free_mem, &total_mem);
     // we leave 10% of cuda memory for twiddle factors and other parameters,
     // 45% for the original data, and 45% for the buffer to do transpose.
     // So if data size exceeds 45% of cuda memory, we will do transpose on CPU
-    if (ext_size * ncols * sizeof(Goldilocks::Element) > total_mem * 9 /20) {
+    if (ext_size * ncols * sizeof(Goldilocks::Element) > nDevices * total_mem * 9 /20) {
       return LDE_MerkleTree_MultiGPU_v3_viaCPU(dst, src, size, ext_size, ncols, buffer, nphase, buildMerkleTree);
     } else if (ncols < 64) {
-      return LDE_MerkleTree_GPU(dst, src, size, ext_size, ncols, buffer, buildMerkleTree, nphase);
+      return LDE_MerkleTree_GPU_v3(dst, src, size, ext_size, ncols, buffer, buildMerkleTree, nphase);
     }
 
-    int nDevices = 0;
-    CHECKCUDAERR(cudaGetDeviceCount(&nDevices));
     uint64_t ncols_per_gpu = (ncols % nDevices) ? ncols / nDevices + 1 : ncols / nDevices;
     uint64_t ncols_last_gpu = ncols - ncols_per_gpu * (nDevices - 1);
     uint64_t aux_ext_size = ext_size * ncols_per_gpu;

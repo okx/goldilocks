@@ -82,12 +82,12 @@ TEST(GOLDILOCKS_TEST, full_gpu)
   printf("dst:\n");
   for (uint64_t i = 0; i < 4; i++) {
     printf("%lu\n", Goldilocks::toU64(b[i]));
-    printf("%lu\n", Goldilocks::toU64(b[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
+    printf("%lu\n", Goldilocks::toU64(b[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * 8 - 8 + i]));
   }
   printf("buffer:\n");
   for (uint64_t i = 0; i < 4; i++) {
     printf("%lu\n", Goldilocks::toU64(c[i]));
-    printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
+    printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 + i]));
   }
 
   uint64_t free_mem, total_mem;
@@ -133,12 +133,12 @@ TEST(GOLDILOCKS_TEST, full_um)
   printf("dst:\n");
   for (uint64_t i = 0; i < 4; i++) {
     printf("%lu\n", Goldilocks::toU64(b[i]));
-    printf("%lu\n", Goldilocks::toU64(b[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
+    printf("%lu\n", Goldilocks::toU64(b[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * 8 - 8 + i]));
   }
   printf("buffer:\n");
   for (uint64_t i = 0; i < 4; i++) {
     printf("%lu\n", Goldilocks::toU64(c[i]));
-    printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 -i]));
+    printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 + i]));
   }
 
   cudaFree(a);
@@ -150,6 +150,7 @@ TEST(GOLDILOCKS_TEST, full_cpu)
 {
   Goldilocks::Element *a = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
   Goldilocks::Element *b = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
+  Goldilocks::Element *c = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
 
   NTT_Goldilocks ntt(FFT_SIZE);
 
@@ -170,11 +171,23 @@ TEST(GOLDILOCKS_TEST, full_cpu)
   }
 
   TimerStart(LDE_MerkleTree_CPU);
-  ntt.LDE_MerkleTree_CPU(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS);
+  ntt.LDE_MerkleTree_CPU(b, a, FFT_SIZE, FFT_SIZE<<BLOWUP_FACTOR, NUM_COLUMNS, c);
   TimerStopAndLog(LDE_MerkleTree_CPU);
+
+  printf("dst:\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(b[i]));
+    printf("%lu\n", Goldilocks::toU64(b[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * 8 - 8 + i]));
+  }
+  printf("buffer:\n");
+  for (uint64_t i = 0; i < 4; i++) {
+    printf("%lu\n", Goldilocks::toU64(c[i]));
+    printf("%lu\n", Goldilocks::toU64(c[(uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS - 4 + i]));
+  }
 
   free(a);
   free(b);
+  free(c);
 }
 #endif
 
