@@ -16,6 +16,14 @@ gl64_t *gpu_inverse_twiddle_factors[MAX_GPUS];
 gl64_t *gpu_r_[MAX_GPUS];
 cudaStream_t gpu_stream[MAX_GPUS];
 gl64_t *gpu_poseidon_state[MAX_GPUS];
+uint64_t *global_buffer;
+
+void NTT_Goldilocks::init_global_buffer(uint64_t n) {
+  cudaMallocHost(&global_buffer, n * sizeof(uint64_t));
+}
+void NTT_Goldilocks::free_global_buffer() {
+  cudaFreeHost(global_buffer);
+}
 
 // #define GPU_TIMING
 // #define GPU_TIMING_2
@@ -2302,7 +2310,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_viaCPU(Goldilocks::Element *dst,
     TimerStart(LDE_MerkleTree_MultiGPU_PartialCleanup);
 #endif
 
-    uint64_t* buffer2 = (uint64_t*)malloc(ext_size * ncols * sizeof(uint64_t));
+    uint64_t* buffer2 = global_buffer;
     assert(NULL != buffer2);
 
 #pragma omp parallel for num_threads(nDevices)
@@ -2366,7 +2374,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_viaCPU(Goldilocks::Element *dst,
             uint64_t* src = buffer2 + d * ext_size * ncols_per_gpu + row * ncols_last_gpu;
             memcpy(dst + d * ncols_per_gpu, src, ncols_last_gpu * sizeof(uint64_t));
         }
-        free(buffer2);
+        //free(buffer2);
 
 #ifdef GPU_TIMING
         TimerStopAndLog(LDE_MerkleTree_MultiGPU_MerkleTree_TransposeOnCPU);
