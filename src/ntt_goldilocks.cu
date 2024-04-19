@@ -17,14 +17,6 @@ gl64_t *gpu_inverse_twiddle_factors[MAX_GPUS];
 gl64_t *gpu_r_[MAX_GPUS];
 cudaStream_t gpu_stream[MAX_GPUS];
 gl64_t *gpu_poseidon_state[MAX_GPUS];
-uint64_t *global_buffer;
-
-void NTT_Goldilocks::init_global_buffer(uint64_t n) {
-  cudaMallocHost(&global_buffer, n * sizeof(uint64_t));
-}
-void NTT_Goldilocks::free_global_buffer() {
-  cudaFreeHost(global_buffer);
-}
 
 // #define GPU_TIMING
 // #define GPU_TIMING_2
