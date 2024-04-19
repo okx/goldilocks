@@ -59,7 +59,6 @@ TEST(GOLDILOCKS_TEST, full_gpu)
   Goldilocks::Element *c = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
 
   NTT_Goldilocks ntt(FFT_SIZE);
-  ntt.init_global_buffer((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS);
   warmup_all_gpus();
 
   for (uint i = 0; i < 2; i++)
@@ -100,7 +99,7 @@ TEST(GOLDILOCKS_TEST, full_gpu)
   free(a);
   free(b);
   free(c);
-  ntt.free_global_buffer();
+  free_pinned_mem();
 }
 
 TEST(GOLDILOCKS_TEST, full_um)
