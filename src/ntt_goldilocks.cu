@@ -1,5 +1,6 @@
 #include "ntt_goldilocks.hpp"
 #include "cuda_utils.cuh"
+#include "cuda_utils.hpp"
 #include "gl64_t.cuh"
 #include "poseidon_goldilocks.hpp"
 #include "ntt_goldilocks.cuh"
@@ -2310,7 +2311,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_viaCPU(Goldilocks::Element *dst,
     TimerStart(LDE_MerkleTree_MultiGPU_PartialCleanup);
 #endif
 
-    uint64_t* buffer2 = global_buffer;
+    uint64_t* buffer2 = get_pinned_mem();
     assert(NULL != buffer2);
 
 #pragma omp parallel for num_threads(nDevices)

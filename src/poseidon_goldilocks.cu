@@ -1,5 +1,6 @@
 #include "gl64_t.cuh"
 #include "cuda_utils.cuh"
+#include "cuda_utils.hpp"
 
 #include "poseidon_goldilocks.hpp"
 #include "merklehash_goldilocks.hpp"
@@ -563,7 +564,16 @@ void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full(Goldilocks::Element *tre
         pending = pending / 2;
         nextN = floor((pending - 1) / 2) + 1;
     }
-    CHECKCUDAERR(cudaMemcpy(tree, gpu_final_tree, numElementsTree * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+    uint64_t *buffer = get_pinned_mem();
+    CHECKCUDAERR(cudaMemcpy(buffer, gpu_final_tree, numElementsTree * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+    uint64_t piece = numElementsTree / ngpu;
+    uint64_t last_piece = numElementsTree - (ngpu -1) * piece;
+#pragma omp parallel for num_threads(ngpu)
+    for (uint64_t d = 0; d < ngpu; d++) {
+      uint64_t cur_piece = d == ngpu -1 ? last_piece: piece;
+      memcpy(tree+d*piece, buffer+d*piece, cur_piece * sizeof(uint64_t))
+    }
+
     CHECKCUDAERR(cudaFree(gpu_final_tree));
 }
 

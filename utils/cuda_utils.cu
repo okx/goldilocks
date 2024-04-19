@@ -3,24 +3,25 @@
 
 #define MAX_GPUS 16
 
-void* alloc_pinned_mem(size_t len)
+uint64_t *global_buffer;
+
+void alloc_pinned_mem(uint64_t n)
 {
-    void* ptr;
-    cudaError_t status = cudaMallocHost(&ptr, len);
-    if (status != cudaSuccess)
-    {
-        ptr = NULL;
-    }
-    return ptr;
+  CHECKCUDAERR(cudaMallocHost(&global_buffer, n * sizeof(uint64_t)));
 }
 
-void free_pinned_mem(void* ptr)
+uint64_t* get_pinned_mem() {
+  return global_buffer;
+}
+
+void free_pinned_mem()
 {
-    cudaFreeHost(ptr);
+    cudaFreeHost(global_buffer);
 }
 
 void warmup_all_gpus()
 {
+    alloc_pinned_mem((uint64_t(1) << 24) * 751)
     uint64_t *gpu_a[MAX_GPUS];
     uint64_t size = (1 << 20);
 
