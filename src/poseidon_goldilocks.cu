@@ -1,6 +1,7 @@
 #include "gl64_t.cuh"
 #include "cuda_utils.cuh"
 #include "cuda_utils.hpp"
+#include <omp.h>
 
 #include "poseidon_goldilocks.hpp"
 #include "merklehash_goldilocks.hpp"
@@ -568,12 +569,14 @@ void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full(Goldilocks::Element *tre
     TimerStart(merkletree_cuda_multi_gpu_full_cudaMemcpy);
     CHECKCUDAERR(cudaMemcpy(buffer, gpu_final_tree, numElementsTree * sizeof(uint64_t), cudaMemcpyDeviceToHost));
     TimerStopAndLog(merkletree_cuda_multi_gpu_full_cudaMemcpy);
-    uint64_t piece = numElementsTree / ngpu;
-    uint64_t last_piece = numElementsTree - (ngpu -1) * piece;
+
+    uint64_t nthreads = omp_get_max_threads();
+    uint64_t piece = numElementsTree / nthreads;
+    uint64_t last_piece = numElementsTree - (nthreads -1) * piece;
     TimerStart(merkletree_cuda_multi_gpu_full_memcpy);
-#pragma omp parallel for num_threads(ngpu)
-    for (uint64_t d = 0; d < ngpu; d++) {
-      uint64_t cur_piece = d == ngpu -1 ? last_piece: piece;
+#pragma omp parallel for num_threads(nthreads)
+    for (uint64_t d = 0; d < nthreads; d++) {
+      uint64_t cur_piece = d == nthreads -1 ? last_piece: piece;
       memcpy(tree+d*piece, buffer+d*piece, cur_piece * sizeof(uint64_t));
     }
     TimerStopAndLog(merkletree_cuda_multi_gpu_full_memcpy);
