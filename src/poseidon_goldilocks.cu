@@ -571,7 +571,7 @@ void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full(Goldilocks::Element *tre
 #pragma omp parallel for num_threads(ngpu)
     for (uint64_t d = 0; d < ngpu; d++) {
       uint64_t cur_piece = d == ngpu -1 ? last_piece: piece;
-      memcpy(tree+d*piece, buffer+d*piece, cur_piece * sizeof(uint64_t))
+      memcpy(tree+d*piece, buffer+d*piece, cur_piece * sizeof(uint64_t));
     }
 
     CHECKCUDAERR(cudaFree(gpu_final_tree));
