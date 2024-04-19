@@ -565,14 +565,18 @@ void PoseidonGoldilocks::merkletree_cuda_multi_gpu_full(Goldilocks::Element *tre
         nextN = floor((pending - 1) / 2) + 1;
     }
     uint64_t *buffer = get_pinned_mem();
+    TimerStart(merkletree_cuda_multi_gpu_full_cudaMemcpy);
     CHECKCUDAERR(cudaMemcpy(buffer, gpu_final_tree, numElementsTree * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+    TimerStopAndLog(merkletree_cuda_multi_gpu_full_cudaMemcpy);
     uint64_t piece = numElementsTree / ngpu;
     uint64_t last_piece = numElementsTree - (ngpu -1) * piece;
+    TimerStart(merkletree_cuda_multi_gpu_full_memcpy);
 #pragma omp parallel for num_threads(ngpu)
     for (uint64_t d = 0; d < ngpu; d++) {
       uint64_t cur_piece = d == ngpu -1 ? last_piece: piece;
       memcpy(tree+d*piece, buffer+d*piece, cur_piece * sizeof(uint64_t));
     }
+    TimerStopAndLog(merkletree_cuda_multi_gpu_full_memcpy);
 
     CHECKCUDAERR(cudaFree(gpu_final_tree));
 }
