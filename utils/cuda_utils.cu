@@ -21,7 +21,7 @@ void free_pinned_mem()
 
 void warmup_all_gpus()
 {
-    alloc_pinned_mem((uint64_t(1) << 24) * 751)
+    alloc_pinned_mem((uint64_t(1) << 24) * 751);
     uint64_t *gpu_a[MAX_GPUS];
     uint64_t size = (1 << 20);
 

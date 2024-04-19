@@ -2,6 +2,7 @@
 #define _CUDA_UTILS_H_
 
 #include <stddef.h>
+#include <stdint.h>
 
 void alloc_pinned_mem(uint64_t n);
 
