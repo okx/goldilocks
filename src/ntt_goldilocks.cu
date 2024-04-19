@@ -1,5 +1,6 @@
 #include "ntt_goldilocks.hpp"
 #include "cuda_utils.cuh"
+#include "cuda_utils.hpp"
 #include "gl64_t.cuh"
 #include "poseidon_goldilocks.hpp"
 #include "ntt_goldilocks.cuh"
@@ -1953,12 +1954,9 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3(Goldilocks::Element *dst, Goldil
 
     uint64_t free_mem, total_mem;
     cudaMemGetInfo(&free_mem, &total_mem);
-    // we leave 10% of cuda memory for twiddle factors and other parameters,
-    // 45% for the original data, and 45% for the buffer to do transpose.
-    // So if data size exceeds 45% of cuda memory, we will do transpose on CPU
-    if (ext_size * ncols * sizeof(Goldilocks::Element) > nDevices * total_mem * 9 /20) {
+    if (ncols >= nDevices * 8) {
       return LDE_MerkleTree_MultiGPU_v3_viaCPU(dst, src, size, ext_size, ncols, buffer, nphase, buildMerkleTree);
-    } else if (ncols < 64) {
+    } else {
       return LDE_MerkleTree_GPU_v3(dst, src, size, ext_size, ncols, buffer, buildMerkleTree, nphase);
     }
 
@@ -2302,7 +2300,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_viaCPU(Goldilocks::Element *dst,
     TimerStart(LDE_MerkleTree_MultiGPU_PartialCleanup);
 #endif
 
-    uint64_t* buffer2 = (uint64_t*)malloc(ext_size * ncols * sizeof(uint64_t));
+    uint64_t* buffer2 = get_pinned_mem();
     assert(NULL != buffer2);
 
 #pragma omp parallel for num_threads(nDevices)
@@ -2366,7 +2364,7 @@ void NTT_Goldilocks::LDE_MerkleTree_MultiGPU_v3_viaCPU(Goldilocks::Element *dst,
             uint64_t* src = buffer2 + d * ext_size * ncols_per_gpu + row * ncols_last_gpu;
             memcpy(dst + d * ncols_per_gpu, src, ncols_last_gpu * sizeof(uint64_t));
         }
-        free(buffer2);
+        //free(buffer2);
 
 #ifdef GPU_TIMING
         TimerStopAndLog(LDE_MerkleTree_MultiGPU_MerkleTree_TransposeOnCPU);

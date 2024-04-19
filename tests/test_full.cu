@@ -3,6 +3,7 @@
 #include "../src/poseidon_goldilocks.hpp"
 #include "../src/ntt_goldilocks.hpp"
 #include "../utils/timer.hpp"
+#include "../utils/cuda_utils.hpp"
 
 TEST(GOLDILOCKS_TEST, avx_op)
 {
@@ -58,6 +59,8 @@ TEST(GOLDILOCKS_TEST, full_gpu)
   Goldilocks::Element *c = (Goldilocks::Element *)malloc((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS * sizeof(Goldilocks::Element));
 
   NTT_Goldilocks ntt(FFT_SIZE);
+  warmup_all_gpus();
+  alloc_pinned_mem((uint64_t)(FFT_SIZE << BLOWUP_FACTOR) * NUM_COLUMNS);
 
   for (uint i = 0; i < 2; i++)
   {
@@ -97,6 +100,7 @@ TEST(GOLDILOCKS_TEST, full_gpu)
   free(a);
   free(b);
   free(c);
+  free_pinned_mem();
 }
 
 TEST(GOLDILOCKS_TEST, full_um)

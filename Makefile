@@ -90,7 +90,7 @@ runtestscpu: testscpu
 runtestsgpu: testsgpu
 	./testsgpu --gtest_filter=GOLDILOCKS_TEST.merkletree_cuda
 
-fullgpu: $(BUILD_DIR_GPU)/tests/test_full.cu.o $(BUILD_DIR_GPU)/src/goldilocks_base_field.cpp.o  $(BUILD_DIR_GPU)/utils/timer.cpp.o  $(BUILD_DIR_GPU)/src/poseidon_goldilocks.cpp.o $(BUILD_DIR_GPU)/src/ntt_goldilocks.cu.o $(BUILD_DIR_GPU)/src/poseidon_goldilocks.cu.o
+fullgpu: $(BUILD_DIR_GPU)/tests/test_full.cu.o $(BUILD_DIR_GPU)/src/goldilocks_base_field.cpp.o  $(BUILD_DIR_GPU)/utils/timer.cpp.o $(BUILD_DIR_GPU)/utils/cuda_utils.cu.o  $(BUILD_DIR_GPU)/src/poseidon_goldilocks.cpp.o $(BUILD_DIR_GPU)/src/ntt_goldilocks.cu.o $(BUILD_DIR_GPU)/src/poseidon_goldilocks.cu.o
 	$(NVCC) -DGPU_TIMING -Xcompiler -fopenmp -arch=$(CUDA_ARCH) -o $@ $^ -lgtest -lgmp
 
 runfullgpu: fullgpu
