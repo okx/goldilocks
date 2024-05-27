@@ -3,9 +3,10 @@
 ## Setup
 ### Dependencies
 ```
-sudo apt-get install libgtest-dev libomp-dev libgmp-dev libbenchmark-dev
+sudo apt-get install g++ make libgtest-dev libomp-dev libgmp-dev libbenchmark-dev
 ```
 
+### CUDA
 For CUDA 12.3:
 
 ```
@@ -14,6 +15,57 @@ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/
 sudo dpkg -i cuda-keyring_1.1-1_all.deb
 sudo apt-get update
 sudo apt-get -y install cuda-toolkit-12-3
+```
+
+## ARM SVE
+
+For the latest compiler support on a ``x86_64`` host, use Docker:
+
+```
+docker build -f Dockerfile.Qemu -t myubuntuqemu .
+docker run -v `pwd`:/goldilocks -it myubuntuqemu bash
+```
+
+In docker:
+
+```
+# cd /goldilocks
+# make -f Makefile.Aarch64Qemu clean
+# make -f Makefile.Aarch64Qemu qtestsve
+# make -f Makefile.Aarch64Qemu runqtest256
+```
+
+On a native ``aarch64`` system, such as a [AWS c7g](https://aws.amazon.com/ec2/instance-types/c7g/) instance, you can run the quick test, micro-benchmarks, and Merkle Tree benchmark, as follows:
+
+```
+make qtestsve
+make benchsve
+make benchmtsve
+
+./qtestsve
+./benchsve
+./benchmtsve
+```
+
+To change the number of OpenMP threads used by the Merkle Tree benchmark, run:
+
+```
+export OMP_NUM_THREADS=<x>
+./benchmtsve
+```
+
+## Comparison with AVX2
+
+On a native ``x86_64`` system with AVX2 support, such as a [AWS c7i](https://aws.amazon.com/ec2/instance-types/c7i/) instance, you can run the quick test, micro-benchmarks, and Merkle Tree benchmark, as follows:
+
+```
+make qtestavx
+make benchavx
+make benchmtavx
+
+./qtestavx
+./benchavx
+./benchmtavx
 ```
 
 ## Usage

@@ -163,6 +163,7 @@ void PoseidonGoldilocks::merkletree_batch_seq(Goldilocks::Element *tree, Goldilo
     }
 }
 
+#ifdef __USE_AVX__
 void PoseidonGoldilocks::hash_full_result(Goldilocks::Element *state, const Goldilocks::Element *input)
 {
     const int length = SPONGE_WIDTH * sizeof(Goldilocks::Element);
@@ -350,6 +351,7 @@ void PoseidonGoldilocks::merkletree_batch_avx(Goldilocks::Element *tree, Goldilo
         nextN = floor((pending - 1) / 2) + 1;
     }
 }
+#endif // __USE_AVX__
 
 #ifdef __AVX512__
 void PoseidonGoldilocks::hash_full_result_avx512(Goldilocks::Element *state, const Goldilocks::Element *input)

@@ -33,10 +33,6 @@ KERNEL = $(shell uname -s)
 ifneq ($(KERNEL),Linux)
  $(error "$(KERNEL), is not a valid kernel")
 endif
-ARCH = $(shell uname -m)
-ifneq ($(ARCH),x86_64)
- $(error "$(ARCH), is not a valid architecture")
-endif
 
 SRCS := $(shell find $(SRC_DIRS) -name *.cpp -or -name *.asm -or -name *.cu)
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
@@ -100,9 +96,38 @@ runbenchcpu: benchcpu
 runbenchgpu: benchgpu
 	./benchgpu --benchmark_filter=MERKLETREE_BENCH_CUDA
 
+qtestavx: tests/test_vec_quick.cpp
+	$(CXX) $(CXXFLAGS) -D__USE_AVX__ -D__NO_GMP__ -O3 -mavx2 $^ -o $@
+
+qtestsve: tests/test_vec_quick.cpp
+	$(CXX) -D__USE_SVE__ -D__NO_GMP__ -O3 -march=armv9-a -mtune=neoverse-v1 $^ -o $@
+
+benchavx: benchs/bench_vec_ops.cpp src/goldilocks_base_field_sve.hpp src/goldilocks_base_field_scalar.hpp
+	$(CXX) $(CXXFLAGS) -D__USE_AVX__ -D__NO_GMP__ -O3 -mavx2 benchs/bench_vec_ops.cpp -fopenmp -o $@
+
+benchavxpapi: benchs/bench_vec_ops.cpp src/goldilocks_base_field_sve.hpp src/goldilocks_base_field_scalar.hpp utils/papi.cpp utils/papi.hpp
+	$(CXX) $(CXXFLAGS) utils/papi.cpp -c
+	$(CXX) $(CXXFLAGS) -Iutils -D__USE_PAPI__ -D__USE_AVX__ -D__NO_GMP__ -O3 -mavx2 benchs/bench_vec_ops.cpp -fopenmp -c
+	$(CXX) $(CXXFLAGS) -O3 papi.o bench_vec_ops.o -o $@ -lpapi
+
+benchmtavx: benchs/bench_vec_merkle.cpp src/poseidon_goldilocks.cpp src/goldilocks_base_field.cpp
+	$(CXX) $(CXXFLAGS) -Isrc -D__USE_AVX__ -O3 -mavx2 $^ -fopenmp -o $@ -lgmp
+
+benchsve: benchs/bench_vec_ops.cpp src/goldilocks_base_field_sve.hpp src/goldilocks_base_field_scalar.hpp
+	$(CXX) -D__USE_SVE__ -D__NO_GMP__ -O3 -march=armv9-a -mtune=neoverse-v1 benchs/bench_vec_ops.cpp -fopenmp -o $@
+
+benchsvepapi: benchs/bench_vec_ops.cpp src/goldilocks_base_field_sve.hpp src/goldilocks_base_field_scalar.hpp utils/papi.cpp utils/papi.hpp
+	$(CXX) utils/papi.cpp -c
+	$(CXX) -Iutils -D__USE_PAPI__ -D__USE_SVE__ -D__NO_GMP__ -O3 -march=armv9-a -mtune=neoverse-v1 benchs/bench_vec_ops.cpp -fopenmp -c
+	$(CXX) -O3 papi.o bench_vec_ops.o -o $@ -lpapi
+
+benchmtsve: benchs/bench_vec_merkle.cpp src/poseidon_goldilocks_sve.cpp
+	$(CXX) -D__USE_SVE__ -Isrc -O3 -march=armv9-a -mtune=neoverse-v1 $^ -fopenmp -o $@ -lgmp
+
 clean:
 	$(RM) -r $(BUILD_DIR)
 	$(RM) -r $(BUILD_DIR_GPU)
+	$(RM) -f benchavx benchavxpapi benchmtavx qtestavx benchsve benchsvepapi benchmtsve qtestsve
 
 -include $(DEPS)
 

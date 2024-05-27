@@ -3,10 +3,17 @@
 
 #include <stdint.h> // uint64_t
 #include <string>   // string
+#ifndef __NO_GMP__
 #include <gmpxx.h>
+#endif
 #include <iostream> // string
 #include <omp.h>
+#ifdef __USE_AVX__
 #include <immintrin.h>
+#endif
+#ifdef __USE_SVE__
+#include <arm_sve.h>
+#endif
 
 #define USE_MONTGOMERY 0
 #define GOLDILOCKS_DEBUG 0
@@ -17,6 +24,7 @@
 
 #define AVX_SIZE_ 4
 #define AVX512_SIZE_ 8
+#define SVE_SIZE_ 4
 
 class Goldilocks
 {
@@ -70,8 +78,11 @@ public:
     static void fromS32(Element &result, int32_t in1);
     static Element fromString(const std::string &in1, int radix = 10);
     static void fromString(Element &result, const std::string &in1, int radix = 10);
+
+#ifndef __NO_GMP__
     static Element fromScalar(const mpz_class &scalar);
     static void fromScalar(Element &result, const mpz_class &scalar);
+#endif
 
     static uint64_t toU64(const Element &in1);
     static void toU64(uint64_t &result, const Element &in1);
@@ -90,17 +101,18 @@ public:
     static void parcpy(Element *dst, const Element *src, uint64_t size, int num_threads_copy = 64);
     static void parSetZero(Element *dst, uint64_t size, int num_threads_copy = 64);
 
+    static void add(uint64_t &result, const uint64_t &in1, const uint64_t &in2);
     static Element add(const Element &in1, const Element &in2);
     static void add(Element &result, const Element &in1, const Element &in2);
     static Element inc(const Goldilocks::Element &fe);
 
+    static void sub(uint64_t &result, const uint64_t &in1, const uint64_t &in2);
     static Element sub(const Element &in1, const Element &in2);
     static void sub(Element &result, const Element &in1, const Element &in2);
     static Element dec(const Goldilocks::Element &fe);
 
     static Element mul(const Element &in1, const Element &in2);
     static void mul(Element &result, const Element &in1, const Element &in2);
-    static void mul2(Element &result, const Element &in1, const Element &in2);
 
     static Element square(const Element &in1);
     static void square(Element &result, const Element &in1);
@@ -164,6 +176,7 @@ public:
     /*
         AVX operations
     */
+#ifdef __USE_AVX__
     static void set_avx(__m256i &a, const Goldilocks::Element &a3, const Goldilocks::Element &a2, const Goldilocks::Element &a1, const Goldilocks::Element &a0);
     static void load_avx(__m256i &a, const Goldilocks::Element *a4);
     static void load_avx_a(__m256i &a, const Goldilocks::Element *a4_a);
@@ -298,7 +311,7 @@ public:
     static void mul_avx(Element *c, uint64_t offset_c[4], const __m256i &a_, const Element *b, uint64_t offset_b);
     static void mul_avx(Element *c, uint64_t offset_c[4], const Element *a4, const __m256i &b_, const uint64_t offset_a[4]);
     static void mul_avx(Element *c, uint64_t offset_c[4], const Element *a, const Element *b, const uint64_t offset_a[4], const uint64_t offset_b[4]);
-    
+#endif    
 
     /*
         AVX512 operations
@@ -423,6 +436,143 @@ public:
     static void mul_avx512(Element *c, uint64_t offset_c[AVX512_SIZE_], const __m512i &a_, const Element *b, uint64_t offset_b);
     static void mul_avx512(Element *c, uint64_t offset_c[AVX512_SIZE_], const Element *a8, const __m512i &b_, const uint64_t offset_a[AVX512_SIZE_]);
 #endif
+
+/*
+        ARM SVE operations
+    */
+#ifdef __USE_SVE__
+    static void set_sve(svuint64_t &a, const Goldilocks::Element &a3, const Goldilocks::Element &a2, const Goldilocks::Element &a1, const Goldilocks::Element &a0);
+    static void load_sve(svuint64_t &a, const Goldilocks::Element *a4);
+    static void load_sve_a(svuint64_t &a, const Goldilocks::Element *a4_a);
+    static void store_sve(Goldilocks::Element *a4, const svuint64_t &a);
+    static void store_sve_a(Goldilocks::Element *a4_a, const svuint64_t &a);
+
+    static void add_sve(svuint64_t &c, const svuint64_t &a, const svuint64_t &b);
+    static void sub_sve(svuint64_t &c, const svuint64_t &a, const svuint64_t &b);
+
+    static void mult_sve(svuint64_t &c, const svuint64_t &a, const svuint64_t &b);
+    static void mult_sve_8(svuint64_t &c, const svuint64_t &a, const svuint64_t &b);
+
+    static void mult_sve_128(svuint64_t &c_h, svuint64_t &c_l, const svuint64_t &a, const svuint64_t &b);
+    static void mult_sve_72(svuint64_t &c_h, svuint64_t &c_l, const svuint64_t &a, const svuint64_t &b);
+    static void reduce_sve_128_64(svuint64_t &c, const svuint64_t &c_h, const svuint64_t &c_l);
+    static void reduce_sve_96_64(svuint64_t &c, const svuint64_t &c_h, const svuint64_t &c_l);
+
+    static void square_sve(svuint64_t &c, svuint64_t &a);
+    static void square_sve_128(svuint64_t &c_h, svuint64_t &c_l, const svuint64_t &a);
+
+    static void transpose(svuint64_t &r0, svuint64_t &r1, svuint64_t &r2, svuint64_t &r3,
+                                    svuint64_t &c0, svuint64_t &c1, svuint64_t &c2, svuint64_t &c3);
+
+    static Element dot_sve(const svuint64_t &a0, const svuint64_t &a1, const svuint64_t &a2, const Element b[12]);
+
+    static void spmv_sve_4x12(svuint64_t &c, const svuint64_t &a0, const svuint64_t &a1, const svuint64_t &a2, const Element b[12]);
+    static void spmv_sve_4x12_8(svuint64_t &c, const svuint64_t &a0, const svuint64_t &a1, const svuint64_t &a2, const Element b_8[12]);
+
+    static void mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, const svuint64_t &a1, const svuint64_t &a2, const Element M[48]);
+    static void mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, const svuint64_t &a1, const svuint64_t &a2, const Element M_8[48]);
+
+    static void mmult_sve(svuint64_t &a0, svuint64_t &a1, svuint64_t &a2, const Element M[144]);
+    static void mmult_sve_8(svuint64_t &a0, svuint64_t &a1, svuint64_t &a2, const Element M_8[144]);
+
+    // implementations for expressions:
+
+    static void copy_sve(Element *dst, const Element &src);
+    static void copy_sve(Element *dst, const Element *src);
+    static void copy_sve(Element *dst, uint64_t stride_dst, const Element *src, uint64_t stride);
+    static void copy_sve(Element *dst, const Element *src, uint64_t stride);
+    static void copy_sve(Element *dst, const Element *src, uint64_t stride[4]);
+    static void copy_sve(svuint64_t &dst_, const Element &src);
+    static void copy_sve(svuint64_t &dst_, const svuint64_t &src_);
+    static void copy_sve(svuint64_t &dst_, const Element *src, uint64_t stride);
+    static void copy_sve(svuint64_t &dst_, const Element *src, uint64_t stride[4]);
+    static void copy_sve(Element *dst, uint64_t stride, const svuint64_t &src_);
+    static void copy_sve(Element *dst, uint64_t stride[4], const svuint64_t &src_);
+
+    static void add_sve(Element *c4, const Element *a4, const Element *b4);
+    static void add_sve(Element *c4, const Element *a4, const Element *b4, uint64_t offset_b);
+    static void add_sve(Element *c4, const Element *a4, const Element *b4, const uint64_t offset_b[4]);
+    static void add_sve(Element *c4, const Element *a4, const Element b);
+    static void add_sve(Element *c4, const Element *a4, const Element b, uint64_t offset_a);
+    static void add_sve(Element *c4, uint64_t offset_c, const Element *a4, uint64_t offset_a, const Element *b4,  uint64_t offset_b);
+    static void add_sve(Element *c4, const Element *a4, const Element *b4, uint64_t offset_a, uint64_t offset_b);
+    static void add_sve(Element *c4, const Element *a4, const Element *b4, const uint64_t offset_a[4], const uint64_t offset_b[4]);
+    static void add_sve(Element *c4, const Element *a4, const Element b, const uint64_t offset_a[4]);
+
+    static void add_sve(svuint64_t &c_, const svuint64_t &a_, const Element *b4, uint64_t offset_b);
+    static void add_sve(svuint64_t &c_, const svuint64_t &a_, const Element *b4, const uint64_t offset_b[4]);
+    static void add_sve(svuint64_t &c_, const svuint64_t &a_, const Element b);
+    static void add_sve(svuint64_t &c_, const Element *a4, const Element b, uint64_t offset_a);
+    static void add_sve(svuint64_t &c_, const Element *a4, const Element *b4, uint64_t offset_a, uint64_t offset_b);
+    static void add_sve(svuint64_t &c_, const Element *a4, const Element *b4, const uint64_t offset_a[4], const uint64_t offset_b[4]);
+    static void add_sve(svuint64_t &c_, const Element *a4, const Element b, const uint64_t offset_a[4]);
+    static void add_sve(Element *c, uint64_t offset_c, const svuint64_t &a_, const svuint64_t &b_);
+    static void add_sve(Element *c, uint64_t offset_c, const svuint64_t &a_, const Element *b4, uint64_t offset_b);
+    static void add_sve(Element *c, const uint64_t offset_c[4], const svuint64_t &a_, const svuint64_t &b_);
+    static void add_sve(Element *c, const uint64_t offset_c[4], const svuint64_t &a_, const Element *b, uint64_t offset_b);
+    static void add_sve(Element *c, const uint64_t offset_c[4], const svuint64_t &a_, const Element *b, uint64_t offset_b[4]);
+
+    static void sub_sve(Element *c4, const Element *a4, const Element *b4);
+    static void sub_sve(Element *c4, const Element *a4, const Element *b4, uint64_t offset_a, uint64_t offset_b);
+    static void sub_sve(Element *c4, const Element *a4, const Element b);
+    static void sub_sve(Element *c4, const Element a, const Element *b4);
+    static void sub_sve(Element *c4, const Element *a4, const Element b, uint64_t offset_a);
+    static void sub_sve(Element *c4, const Element a, const Element *b4, uint64_t offset_b);
+    static void sub_sve(Element *c4, const Element *a4, const Element *b4, const uint64_t offset_a[4], const uint64_t offset_b[4]);
+    static void sub_sve(Element *c4, const Element a, const Element *b4, const uint64_t offset_b[4]);
+    static void sub_sve(Element *c4, const Element *a4, const Element b, const uint64_t offset_a[4]);
+
+    static void sub_sve(svuint64_t &c_, const Element *a4, const Element *b4, uint64_t offset_a, uint64_t offset_b);
+    static void sub_sve(svuint64_t &c_, const svuint64_t &a_, const Element *b4, uint64_t offset_b);
+    static void sub_sve(svuint64_t &c_, const Element *a4, const svuint64_t &b_, uint64_t offset_a);
+    static void sub_sve(svuint64_t &c_, const svuint64_t &a_, const Element b);
+    static void sub_sve(svuint64_t &c_, const Element a, const svuint64_t &b_);
+    static void sub_sve(svuint64_t &c_, const Element *a4, const Element b, uint64_t offset_a);
+    static void sub_sve(svuint64_t &c_, const Element a, const Element *b4, uint64_t offset_b);
+    static void sub_sve(svuint64_t &c_, const Element *a4, uint64_t offset_a, const svuint64_t &b_);
+    static void sub_sve(svuint64_t &c_, const Element *a4, const Element *b4, const uint64_t offset_a[4], const uint64_t offset_b[4]);
+    static void sub_sve(svuint64_t &c_, const Element a, const Element *b4, const uint64_t offset_b[4]);
+    static void sub_sve(svuint64_t &c_, const Element *a4, const Element b, const uint64_t offset_a[4]);
+    static void sub_sve(svuint64_t &c_, const svuint64_t &a_, const Element *b4, uint64_t offset_b[4]);
+    static void sub_sve(svuint64_t &c_, const Element *a4, const svuint64_t &b_, uint64_t offset_a[4]);
+
+    static void sub_sve(Element *c, uint64_t offset_c, const svuint64_t &a_, const svuint64_t &b_);
+    static void sub_sve(Element *c, const uint64_t offset_c[4], const svuint64_t &a_, const svuint64_t &b_);
+    static void sub_sve(Element *c, uint64_t offset_c, const Element a, const svuint64_t &b_);
+    static void sub_sve(Element *c, const uint64_t offset_c[4], const Element a, const svuint64_t &b_);
+
+    static void mul_sve(Element *c4, const Element *a4, const Element *b4);
+    static void mul_sve(Element *c4, const Element a, const Element *b4);
+    static void mul_sve(Element *c4, const Element *a4, const Element *b4, uint64_t offset_a, uint64_t offset_b);
+    static void mul_sve(Element *c4, const Element a, const Element *b4, uint64_t offset_b);
+    static void mul_sve(Element *c4, const Element *a4, const Element *b4, const uint64_t offset_a[4], const uint64_t offset_b[4]);
+
+    static void mul_sve(svuint64_t &c_, const Element a, const svuint64_t &b_);
+    static void mul_sve(svuint64_t &c_, const Element *a4, const Element *b4, uint64_t offset_a, uint64_t offset_b);
+    static void mul_sve(svuint64_t &c_, const svuint64_t &a_, const Element *b4, uint64_t offset_b);
+    static void mul_sve(svuint64_t &c_, const Element *a4, const svuint64_t &b_, uint64_t offset_a);
+    static void mul_sve(svuint64_t &c_, const Element a, const Element *b4, uint64_t offset_b);
+    static void mul_sve(svuint64_t &c_, const Element *a4, const Element *b4, const uint64_t offset_a[4], const uint64_t offset_b[4]);
+    static void mul_sve(svuint64_t &c_, const svuint64_t &a_, const Element *b4, const uint64_t offset_b[4]);
+    static void mul_sve(svuint64_t &c_, const Element *a4, const svuint64_t &b_, const uint64_t offset_a[4]);
+    static void mul_sve(svuint64_t &c_, const Element *a4, const Element b, const uint64_t offset_a[4]);
+
+    static void mul_sve(Element *c, uint64_t offset_c, const Element *a, uint64_t offset_a, const Element *b, uint64_t offset_b);
+    static void mul_sve(Element *c, uint64_t offset_c, const svuint64_t &a_, const svuint64_t &b_);
+    static void mul_sve(Element *c, uint64_t offset_c, const Element *a4, const svuint64_t &b_, uint64_t offset_a);
+    static void mul_sve(Element *c, uint64_t offset_c, const svuint64_t &a_, const Element *b, uint64_t offset_b);
+    static void mul_sve(Element *c, uint64_t offset_c, const Element *a4, const svuint64_t &b_, const uint64_t offset_a[4]);
+    static void mul_sve(Element *c, uint64_t offset_c[4], const svuint64_t &a_, const svuint64_t &b_);
+    static void mul_sve(Element *c, uint64_t offset_c[4], const Element *a4, const svuint64_t &b_, uint64_t offset_a);
+    static void mul_sve(Element *c, uint64_t offset_c[4], const svuint64_t &a_, const Element *b, uint64_t offset_b);
+    static void mul_sve(Element *c, uint64_t offset_c[4], const Element *a4, const svuint64_t &b_, const uint64_t offset_a[4]);
+    static void mul_sve(Element *c, uint64_t offset_c[4], const Element *a, const Element *b, const uint64_t offset_a[4], const uint64_t offset_b[4]);
+
+    static void mult_sve_reg(svuint64_t &c, const svuint64_t &a, const Goldilocks::Element *b);
+    static void mult_sve_72_reg(svuint64_t &c_h, svuint64_t &c_l, const svuint64_t &a, const Goldilocks::Element *b);
+
+#endif      // __USE_SVE__
+
 };
 
 /*
@@ -436,12 +586,21 @@ inline bool operator==(const Goldilocks::Element &in1, const Goldilocks::Element
 inline Goldilocks::Element operator-(const Goldilocks::Element &in1) { return Goldilocks::neg(in1); }
 inline Goldilocks::Element operator+(const Goldilocks::Element &in1) { return in1; }
 
+#ifndef __NO_GMP__
 #include "goldilocks_base_field_tools.hpp"
+#endif
 #include "goldilocks_base_field_scalar.hpp"
 #include "goldilocks_base_field_batch.hpp"
+
+#ifdef __USE_SVE__
+#include "goldilocks_base_field_sve.hpp"
+#endif
+
+#ifdef __USE_AVX__
 #include "goldilocks_base_field_avx.hpp"
 #ifdef __AVX512__
 #include "goldilocks_base_field_avx512.hpp"
+#endif
 #endif
 
 #endif // GOLDILOCKS_BASE

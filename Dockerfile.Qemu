@@ -1,0 +1,3 @@
+FROM ubuntu:24.04
+
+RUN apt update && apt -y install gcc g++ gcc-14 g++-14 make libgtest-dev libomp-dev libgmp-dev libbenchmark-dev qemu-user g++-aarch64-linux-gnu g++-14-aarch64-linux-gnu
