@@ -5,7 +5,7 @@
 typedef svuint64_t vectype_t;
 
 #elif defined(__USE_AVX__)
-#if defined(AVX512)
+#if defined(__AVX512__)
 
 #include "../src/goldilocks_base_field_avx512.hpp"
 #define VEC avx512
@@ -17,7 +17,7 @@ typedef __m512i vectype_t;
 #define VEC avx
 typedef __m256i vectype_t;
 
-#endif  // AVX512
+#endif  // __AVX512__
 
 #endif  // __USE
 
@@ -73,10 +73,14 @@ void run()
 #if defined(__USE_SVE__)
     PoseidonGoldilocks::merkletree_sve(tree, leaves, ncols, nrows);
 #elif defined(__USE_AVX__)
+#ifdef __AVX512__
+    PoseidonGoldilocks::merkletree_avx512(tree, leaves, ncols, nrows);
+#else
     PoseidonGoldilocks::merkletree_avx(tree, leaves, ncols, nrows);
+#endif  // __AVX512__
 #else
     PoseidonGoldilocks::merkletree(tree, leaves, ncols, nrows);
-#endif
+#endif  // __USE_AVX__
     gettimeofday(&end, NULL);
     uint64_t t = end.tv_sec * 1000000 + end.tv_usec - start.tv_sec * 1000000 - start.tv_usec;
     printf("Merkle tree building time: %lu ms\n", t / 1000);

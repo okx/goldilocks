@@ -102,7 +102,7 @@ qtestavx: tests/test_vec_quick.cpp
 qtestsve: tests/test_vec_quick.cpp
 	$(CXX) -D__USE_SVE__ -D__NO_GMP__ -O3 -march=armv9-a -mtune=neoverse-v1 $^ -o $@
 
-benchavx: benchs/bench_vec_ops.cpp src/goldilocks_base_field_sve.hpp src/goldilocks_base_field_scalar.hpp
+benchavx: benchs/bench_vec_ops.cpp src/goldilocks_base_field_avx.hpp src/goldilocks_base_field_scalar.hpp
 	$(CXX) $(CXXFLAGS) -D__USE_AVX__ -D__NO_GMP__ -O3 -mavx2 benchs/bench_vec_ops.cpp -fopenmp -o $@
 
 benchavxpapi: benchs/bench_vec_ops.cpp src/goldilocks_base_field_sve.hpp src/goldilocks_base_field_scalar.hpp utils/papi.cpp utils/papi.hpp
@@ -112,6 +112,9 @@ benchavxpapi: benchs/bench_vec_ops.cpp src/goldilocks_base_field_sve.hpp src/gol
 
 benchmtavx: benchs/bench_vec_merkle.cpp src/poseidon_goldilocks.cpp src/goldilocks_base_field.cpp
 	$(CXX) $(CXXFLAGS) -Isrc -D__USE_AVX__ -O3 -mavx2 $^ -fopenmp -o $@ -lgmp
+
+benchmtavx512: benchs/bench_vec_merkle.cpp src/poseidon_goldilocks.cpp src/goldilocks_base_field.cpp
+	$(CXX) $(CXXFLAGS) -Isrc -D__USE_AVX__ -D__AVX512__ -O3 -mavx2 -mavx512f $^ -fopenmp -o $@ -lgmp
 
 benchsve: benchs/bench_vec_ops.cpp src/goldilocks_base_field_sve.hpp src/goldilocks_base_field_scalar.hpp
 	$(CXX) -D__USE_SVE__ -D__NO_GMP__ -O3 -march=armv9-a -mtune=neoverse-v1 benchs/bench_vec_ops.cpp -fopenmp -o $@

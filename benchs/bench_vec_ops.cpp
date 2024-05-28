@@ -5,7 +5,7 @@
 typedef svuint64_t vectype_t;
 
 #elif defined(__USE_AVX__)
-#if defined(AVX512)
+#if defined(__AVX512__)
 
 #include "../src/goldilocks_base_field_avx512.hpp"
 #define VEC avx512
@@ -17,7 +17,7 @@ typedef __m512i vectype_t;
 #define VEC avx
 typedef __m256i vectype_t;
 
-#endif // AVX512
+#endif // __AVX512__
 
 #endif // __USE
 
