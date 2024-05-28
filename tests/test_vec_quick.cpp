@@ -1,5 +1,6 @@
 #if defined(__USE_SVE__)
 
+#include <sys/prctl.h>
 #include "../src/goldilocks_base_field_sve.hpp"
 #define VEC sve
 typedef svuint64_t vectype_t;
@@ -130,6 +131,12 @@ void test()
     const Goldilocks::Element m48_8[48] = {49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96};
 
 #if defined(__USE_SVE__)
+    int vl_in_bytes = prctl(PR_SVE_GET_VL) & PR_SVE_VL_LEN_MASK;
+    if (vl_in_bytes < 32) {
+        printf("FATAL: SVE vector length should be at least 256 bits (it is currently %d bits)!\n", vl_in_bytes * 8);
+        return;
+    }
+
     ax = svld1_u64(svptrue_b64(), (uint64_t *)a);
     bx = svld1_u64(svptrue_b64(), (uint64_t *)b);
     cxref = svld1_u64(svptrue_b64(), (uint64_t *)cref);
@@ -170,7 +177,6 @@ void test()
     g.spmv_sve_4x12(dx, ax, bx, cx, b8);
     dxref = svld1_u64(svptrue_b64(), (uint64_t *)spmvref);
     assert(is_equal(dx, dxref));
-
 
     g.spmv_sve_4x12_8(dx, ax, bx, cx, b8);
     dxref = svld1_u64(svptrue_b64(), (uint64_t *)spmv8ref);
@@ -224,7 +230,6 @@ void test()
     g.spmv_avx_4x12(dx, ax, bx, cx, b8);
     dxref = _mm256_set_epi64x(spmvref[3], spmvref[2], spmvref[1], spmvref[0]);
     assert(is_equal(dx, dxref));
-
 
     g.spmv_avx_4x12_8(dx, ax, bx, cx, b8);
     dxref = _mm256_set_epi64x(spmv8ref[3], spmv8ref[2], spmv8ref[1], spmv8ref[0]);
