@@ -1,8 +1,11 @@
 CXX := aarch64-linux-gnu-g++
-CXXFLAGS := -static -march=armv8-a+sve2 -O3
+CXXFLAGS := -static -march=armv8-a+sve2
 
 qtestsve: tests/test_vec_quick.cpp
 	$(CXX) $(CXXFLAGS) -D__USE_SVE__ -D__NO_GMP__ -Itests/ -Isrc/ $^ -o $@
+
+qtestsve512: tests/test_vec_quick.cpp
+	$(CXX) $(CXXFLAGS) -D__USE_SVE__ -D__SVE_512__ -D__NO_GMP__ -Itests/ -Isrc/ $^ -o $@
 
 benchsve: benchs/bench_vec_ops.cpp src/goldilocks_base_field_sve.hpp src/goldilocks_base_field_scalar.hpp src/poseidon_goldilocks_sve.cpp
 	$(CXX) $(CXXFLAGS) -D__USE_SVE__ -D__NO_GMP__ -O3 benchs/bench_vec_ops.cpp -o $@
@@ -10,8 +13,14 @@ benchsve: benchs/bench_vec_ops.cpp src/goldilocks_base_field_sve.hpp src/goldilo
 benchmtsve: benchs/bench_vec_merkle.cpp src/poseidon_goldilocks_sve.cpp
 	$(CXX) $(CXXFLAGS) -D__USE_SVE__ -D__NO_GMP__ -Isrc -O3 $^ -fopenmp -o $@
 
+runqtest128: qtestsve
+	qemu-aarch64 -cpu max,sve128=on ./qtestsve
+
 runqtest256: qtestsve
 	qemu-aarch64 -cpu max,sve256=on ./qtestsve
 
+runqtest512: qtestsve512
+	qemu-aarch64 -cpu max,sve512=on ./qtestsve512
+
 clean:
-	rm -f qtestsve benchsve benchmtsve
+	rm -f qtestsve benchsve benchmtsve qtestsve512

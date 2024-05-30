@@ -6,31 +6,40 @@
 typedef svuint64_t vectype_t;
 
 #elif defined(__USE_AVX__)
-#if defined(AVX512)
+#if defined(__AVX512__)
 
 #include "../src/goldilocks_base_field_avx512.hpp"
 #define VEC avx512
 typedef __m512i vectype_t;
 
-#else
+#else   // __AVX512__
 
 #include "../src/goldilocks_base_field_avx.hpp"
 #define VEC avx
 typedef __m256i vectype_t;
 
-#endif // AVX512
+#endif // __AVX512__
 
 #endif // __USE
 
 void print_vectype_t(const vectype_t &a)
 {
-    uint64_t buffer[4];
+    uint64_t buffer[8];
+    int len = 4;
 #ifdef __USE_SVE__
+#ifdef __SVE_512__
+    len = 8;
+#endif
     svst1_u64(svptrue_b64(), buffer, a);
 #elif defined(__USE_AVX__)
+#if defined(__AVX512__)
+    _mm512_storeu_si512((__m512i *)buffer, a);
+    len = 8;
+#else
     _mm256_storeu_si256((__m256i *)buffer, a);
 #endif
-    for (int i = 0; i < 4; i++)
+#endif
+    for (int i = 0; i < len; i++)
     {
         printf("0x%lX, ", buffer[i]);
     }
@@ -44,6 +53,10 @@ int is_equal(vectype_t &a, const vectype_t &b)
     svbool_t ncomp = svnot_z(svptrue_b64(), comp);
     return !svptest_any(svptrue_b64(), ncomp);
 #elif defined(__USE_AVX__)
+#if defined(__AVX512__)
+    uint8_t r = _mm512_cmpeq_epi64_mask(a, b);
+    return (r == 0xFF);
+#else   // __AVX512__
     uint64_t ru64[4] = {0};
     __m256i r = _mm256_cmpeq_epi64(a, b);
     _mm256_storeu_si256((__m256i *)ru64, r);
@@ -51,27 +64,28 @@ int is_equal(vectype_t &a, const vectype_t &b)
             ru64[1] == 0xFFFFFFFFFFFFFFFF &&
             ru64[2] == 0xFFFFFFFFFFFFFFFF &&
             ru64[3] == 0xFFFFFFFFFFFFFFFF);
+#endif  // __AVX512__
 #endif
 }
 
-const uint64_t a[4] = {0x2D34400001D1E159, 0x65403422B2810798, 0x32C8E58040D6FC6D, 0xAD9626433BC76360};
-const uint64_t b[4] = {0x35821EA14A86CBAA, 0xC989B9E86A0C22D4, 0x136692D5744E3701, 0x2C358311FB7FD2F5};
-const uint64_t a0[4] = {0x81CEE3D70A501341, 0xB9F336ACFAD566E8, 0xB3309B7384B412A5, 0x52D9626433BC7636};
-const uint64_t a1[4] = {0x9AC10F50A54365D5, 0x62A058ECDF374A63, 0xEDCCD037CDDEA1C5, 0x8D3F3177897FFC89};
-const uint64_t a2[4] = {0x6BED18839B7723F1, 0x538142DDD543B214, 0x3377D174424AFC08, 0xF7BC2ED4A9FCD780};
-const uint64_t cref[4] = {0x62B65EA14C58AD03, 0x2EC9EE0C1C8D2A6B, 0x462F7855B525336E, 0xD9CBA95537473655};
-const uint64_t dref[4] = {0xF7B2215DB74B15B0, 0x9BB67A394874E4C5, 0x1F6252AACC88C56C, 0x8160A3314047906B};
-const uint64_t sqhref[4] = {0x7FB692A10A48765, 0x280BB93D7CD12DBA, 0xA13174D7F77FEC6, 0x75B447C7BB4D915F};
-const uint64_t sqlref[4] = {0xC6D7CFD46BAF90F1, 0xDD373F80769AA40, 0x8553A1C17F22C669, 0xBE540759E5D36400};
-const uint64_t redref[4] = {0x3753FFFA1B80AA51, 0x7C0AC180524AE719, 0x543D8F4200AE5514, 0x67FCE67112224952};
-const uint64_t mul128href[4] = {0x972CB311AE68843, 0x4FB5E1D276868AD3, 0x3D94234E1066F32, 0x1DFA178981477B76};
-const uint64_t mul128lref[4] = {0x8D93476B51A7381A, 0x9B654D6240FC79E0, 0x9FD0D001BE48676D, 0x4604A51B31F6DAE0};
-const uint64_t mul72href[4] = {0xD28E7CF, 0x29F1625F, 0x17128C1D, 0xAA88E40C};
-const uint64_t mul72lref[4] = {0xF3FA207251A7381A, 0x2FA193A240FC79E0, 0x668C9F50BE48676D, 0x330CEBBB31F6DAE0};
-const uint64_t spmvref[4] = {0xCA6D016470C6B6D7, 0x96A04D1ED64B1D86, 0xFBDC46C8738DC830, 0x7A5C84A3AB928CD2};
-const uint64_t spmv8ref[4] = {0xCA6D016470C6B6D7, 0x96A04D1ED64B1D86, 0xFBDC46C8738DC830, 0x7A5C84A3AB928CD2};
-const uint64_t mmultref[4] = {0x337AED673F61EC7, 0x76EEAD38017BDE32, 0x9C8237882F9D9B72, 0x94EC23B006B1C58B};
-const uint64_t mmult8ref[4] = {0x655B96B89203377E, 0x1FA9FE6C1F5AFC42, 0xD9F8661EACB2C107, 0x9446CDD23A0A85CB};
+const uint64_t a[8] = {0x2D34400001D1E159, 0x65403422B2810798, 0x32C8E58040D6FC6D, 0xAD9626433BC76360, 0x2D34400001D1E159, 0x65403422B2810798, 0x32C8E58040D6FC6D, 0xAD9626433BC76360};
+const uint64_t b[8] = {0x35821EA14A86CBAA, 0xC989B9E86A0C22D4, 0x136692D5744E3701, 0x2C358311FB7FD2F5, 0x35821EA14A86CBAA, 0xC989B9E86A0C22D4, 0x136692D5744E3701, 0x2C358311FB7FD2F5};
+const uint64_t a0[8] = {0x81CEE3D70A501341, 0xB9F336ACFAD566E8, 0xB3309B7384B412A5, 0x52D9626433BC7636, 0x81CEE3D70A501341, 0xB9F336ACFAD566E8, 0xB3309B7384B412A5, 0x52D9626433BC7636};
+const uint64_t a1[8] = {0x9AC10F50A54365D5, 0x62A058ECDF374A63, 0xEDCCD037CDDEA1C5, 0x8D3F3177897FFC89, 0x9AC10F50A54365D5, 0x62A058ECDF374A63, 0xEDCCD037CDDEA1C5, 0x8D3F3177897FFC89};
+const uint64_t a2[8] = {0x6BED18839B7723F1, 0x538142DDD543B214, 0x3377D174424AFC08, 0xF7BC2ED4A9FCD780, 0x6BED18839B7723F1, 0x538142DDD543B214, 0x3377D174424AFC08, 0xF7BC2ED4A9FCD780};
+const uint64_t cref[8] = {0x62B65EA14C58AD03, 0x2EC9EE0C1C8D2A6B, 0x462F7855B525336E, 0xD9CBA95537473655, 0x62B65EA14C58AD03, 0x2EC9EE0C1C8D2A6B, 0x462F7855B525336E, 0xD9CBA95537473655};
+const uint64_t dref[8] = {0xF7B2215DB74B15B0, 0x9BB67A394874E4C5, 0x1F6252AACC88C56C, 0x8160A3314047906B, 0xF7B2215DB74B15B0, 0x9BB67A394874E4C5, 0x1F6252AACC88C56C, 0x8160A3314047906B};
+const uint64_t sqhref[8] = {0x7FB692A10A48765, 0x280BB93D7CD12DBA, 0xA13174D7F77FEC6, 0x75B447C7BB4D915F, 0x7FB692A10A48765, 0x280BB93D7CD12DBA, 0xA13174D7F77FEC6, 0x75B447C7BB4D915F};
+const uint64_t sqlref[8] = {0xC6D7CFD46BAF90F1, 0xDD373F80769AA40, 0x8553A1C17F22C669, 0xBE540759E5D36400, 0xC6D7CFD46BAF90F1, 0xDD373F80769AA40, 0x8553A1C17F22C669, 0xBE540759E5D36400};
+const uint64_t redref[8] = {0x3753FFFA1B80AA51, 0x7C0AC180524AE719, 0x543D8F4200AE5514, 0x67FCE67112224952, 0x3753FFFA1B80AA51, 0x7C0AC180524AE719, 0x543D8F4200AE5514, 0x67FCE67112224952};
+const uint64_t mul128href[8] = {0x972CB311AE68843, 0x4FB5E1D276868AD3, 0x3D94234E1066F32, 0x1DFA178981477B76, 0x972CB311AE68843, 0x4FB5E1D276868AD3, 0x3D94234E1066F32, 0x1DFA178981477B76};
+const uint64_t mul128lref[8] = {0x8D93476B51A7381A, 0x9B654D6240FC79E0, 0x9FD0D001BE48676D, 0x4604A51B31F6DAE0, 0x8D93476B51A7381A, 0x9B654D6240FC79E0, 0x9FD0D001BE48676D, 0x4604A51B31F6DAE0};
+const uint64_t mul72href[8] = {0xD28E7CF, 0x29F1625F, 0x17128C1D, 0xAA88E40C, 0xD28E7CF, 0x29F1625F, 0x17128C1D, 0xAA88E40C};
+const uint64_t mul72lref[8] = {0xF3FA207251A7381A, 0x2FA193A240FC79E0, 0x668C9F50BE48676D, 0x330CEBBB31F6DAE0, 0xF3FA207251A7381A, 0x2FA193A240FC79E0, 0x668C9F50BE48676D, 0x330CEBBB31F6DAE0};
+const uint64_t spmvref[8] = {0xCA6D016470C6B6D7, 0x96A04D1ED64B1D86, 0xFBDC46C8738DC830, 0x7A5C84A3AB928CD2, 0xCA6D016470C6B6D7, 0x96A04D1ED64B1D86, 0xFBDC46C8738DC830, 0x7A5C84A3AB928CD2};
+const uint64_t spmv8ref[8] = {0xCA6D016470C6B6D7, 0x96A04D1ED64B1D86, 0xFBDC46C8738DC830, 0x7A5C84A3AB928CD2, 0xCA6D016470C6B6D7, 0x96A04D1ED64B1D86, 0xFBDC46C8738DC830, 0x7A5C84A3AB928CD2};
+const uint64_t mmultref[8] = {0x337AED673F61EC7, 0x76EEAD38017BDE32, 0x9C8237882F9D9B72, 0x94EC23B006B1C58B, 0x337AED673F61EC7, 0x76EEAD38017BDE32, 0x9C8237882F9D9B72, 0x94EC23B006B1C58B};
+const uint64_t mmult8ref[8] = {0x655B96B89203377E, 0x1FA9FE6C1F5AFC42, 0xD9F8661EACB2C107, 0x9446CDD23A0A85CB, 0x655B96B89203377E, 0x1FA9FE6C1F5AFC42, 0xD9F8661EACB2C107, 0x9446CDD23A0A85CB};
 
 void test()
 {
@@ -190,6 +204,7 @@ void test()
     dxref = svld1_u64(svptrue_b64(), (uint64_t *)mmult8ref);
     assert(is_equal(dx, dxref));
 #else
+#ifndef __AVX512__
     ax = _mm256_set_epi64x(a[3], a[2], a[1], a[0]);
     bx = _mm256_set_epi64x(b[3], b[2], b[1], b[0]);
     cxref = _mm256_set_epi64x(cref[3], cref[2], cref[1], cref[0]);
@@ -242,6 +257,61 @@ void test()
     g.mmult_avx_4x12_8(dx, ax, bx, cx, m48_8);
     dxref = _mm256_set_epi64x(mmult8ref[3], mmult8ref[2], mmult8ref[1], mmult8ref[0]);
     assert(is_equal(dx, dxref));
+
+#else // __AVX512__
+    ax = _mm512_set_epi64(a[3], a[2], a[1], a[0], a[3], a[2], a[1], a[0]);
+    bx = _mm512_set_epi64(b[3], b[2], b[1], b[0], b[3], b[2], b[1], b[0]);
+    cxref = _mm512_set_epi64(cref[3], cref[2], cref[1], cref[0], cref[3], cref[2], cref[1], cref[0]);
+    dxref = _mm512_set_epi64(dref[3], dref[2], dref[1], dref[0], dref[3], dref[2], dref[1], dref[0]);
+    clxref = _mm512_set_epi64(sqlref[3], sqlref[2], sqlref[1], sqlref[0], sqlref[3], sqlref[2], sqlref[1], sqlref[0]);
+    chxref = _mm512_set_epi64(sqhref[3], sqhref[2], sqhref[1], sqhref[0], sqhref[3], sqhref[2], sqhref[1], sqhref[0]);
+
+    g.add_avx512(cx, ax, bx);
+    assert(is_equal(cx, cxref));
+
+    g.sub_avx512(dx, ax, bx);
+    assert(is_equal(dx, dxref));
+
+    g.square_avx512_128(chx, clx, ax);
+    assert(is_equal(chx, chxref));
+    assert(is_equal(clx, clxref));
+
+    g.reduce_avx512_128_64(cx, ax, bx);
+    cxref = _mm512_set_epi64(redref[3], redref[2], redref[1], redref[0], redref[3], redref[2], redref[1], redref[0]);
+    assert(is_equal(cx, cxref));
+
+    g.mult_avx512_128(chx, clx, ax, bx);
+    chxref = _mm512_set_epi64(mul128href[3], mul128href[2], mul128href[1], mul128href[0], mul128href[3], mul128href[2], mul128href[1], mul128href[0]);
+    clxref = _mm512_set_epi64(mul128lref[3], mul128lref[2], mul128lref[1], mul128lref[0], mul128lref[3], mul128lref[2], mul128lref[1], mul128lref[0]);
+    assert(is_equal(chx, chxref));
+    assert(is_equal(clx, clxref));
+
+    g.mult_avx512_72(chx, clx, ax, bx);
+    chxref = _mm512_set_epi64(mul72href[3], mul72href[2], mul72href[1], mul72href[0], mul72href[3], mul72href[2], mul72href[1], mul72href[0]);
+    clxref = _mm512_set_epi64(mul72lref[3], mul72lref[2], mul72lref[1], mul72lref[0], mul72lref[3], mul72lref[2], mul72lref[1], mul72lref[0]);
+    assert(is_equal(chx, chxref));
+    assert(is_equal(clx, clxref));
+
+    ax = _mm512_set_epi64(a0[3], a0[2], a0[1], a0[0], a0[3], a0[2], a0[1], a0[0]);
+    bx = _mm512_set_epi64(a1[3], a1[2], a1[1], a1[0], a1[3], a1[2], a1[1], a1[0]);
+    cx = _mm512_set_epi64(a2[3], a2[2], a2[1], a2[0], a2[3], a2[2], a2[1], a2[0]);
+
+    g.spmv_avx512_4x12(dx, ax, bx, cx, b8);
+    dxref = _mm512_set_epi64(spmvref[3], spmvref[2], spmvref[1], spmvref[0], spmvref[3], spmvref[2], spmvref[1], spmvref[0]);
+    assert(is_equal(dx, dxref));
+
+    g.spmv_avx512_4x12_8(dx, ax, bx, cx, b8);
+    dxref = _mm512_set_epi64(spmv8ref[3], spmv8ref[2], spmv8ref[1], spmv8ref[0], spmv8ref[3], spmv8ref[2], spmv8ref[1], spmv8ref[0]);
+    assert(is_equal(dx, dxref));
+
+    g.mmult_avx512_4x12(dx, ax, bx, cx, m48);
+    dxref = _mm512_set_epi64(mmultref[3], mmultref[2], mmultref[1], mmultref[0], mmultref[3], mmultref[2], mmultref[1], mmultref[0]);
+    assert(is_equal(dx, dxref));
+
+    g.mmult_avx512_4x12_8(dx, ax, bx, cx, m48_8);
+    dxref = _mm512_set_epi64(mmult8ref[3], mmult8ref[2], mmult8ref[1], mmult8ref[0], mmult8ref[3], mmult8ref[2], mmult8ref[1], mmult8ref[0]);
+    assert(is_equal(dx, dxref));
+#endif  // __AVX512__
 #endif
 
     printf("All tests done.\n");

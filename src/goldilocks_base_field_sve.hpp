@@ -2,6 +2,7 @@
 #define GOLDILOCKS_SVE
 
 #include "goldilocks_base_field.hpp"
+#include <string.h>
 
 #define __USE_SVE_ASM__
 
@@ -392,12 +393,27 @@ inline Goldilocks::Element Goldilocks::dot_sve(const svuint64_t &a0, const svuin
 // c[i]=Sum_j(aj[i]*b[j*4+i]) 0<=i<4 0<=j<3
 inline void Goldilocks::spmv_sve_4x12(svuint64_t &c, const svuint64_t &a0, const svuint64_t &a1, const svuint64_t &a2, const Goldilocks::Element b[12])
 {
+    uint64_t *bb = (uint64_t *)b;
+
+#ifdef __SVE_512__
+    uint64_t b24[16];
+    bb = b24;
+    memcpy(bb, b, 96);
+    uint64_t idx[8] = {8, 8, 8, 8, 0, 1, 2, 3};
+#endif
+
 #ifndef __USE_SVE_ASM__
     svuint64_t b0, b1, b2;
     svuint64_t c0, c1, c2;
-    load_sve(b0, &(b[0]));
-    load_sve(b1, &(b[4]));
-    load_sve(b2, &(b[8]));
+    load_sve(b0, (Goldilocks::Element *)&(bb[0]));
+    load_sve(b1, (Goldilocks::Element *)&(bb[4]));
+    load_sve(b2, (Goldilocks::Element *)&(bb[8]));
+#ifdef __SVE_512__
+    svuint64_t vidx = svld1_u64(svptrue_b64(), idx);
+    b0 = svtbx_u64(b0, b0, vidx);
+    b1 = svtbx_u64(b1, b1, vidx);
+    b2 = svtbx_u64(b2, b2, vidx);
+#endif
     mult_sve(c0, a0, b0);
     mult_sve(c1, a1, b1);
     mult_sve(c2, a2, b2);
@@ -406,10 +422,14 @@ inline void Goldilocks::spmv_sve_4x12(svuint64_t &c, const svuint64_t &a0, const
     add_sve(c, c_, c2);
 #else
     asm inline("ptrue   p7.d, all\n"
-               "mov     z22.d, #0xFFFFFFFF\n"        // P_n
-                                                     // --- mul 1
-               "ld1d    z31.d, p7/z, %1\n"           // a0 (mul_1)
-               "ld1d    z30.d, p7/z, [%4]\n"         // b[0]
+               "mov     z22.d, #0xFFFFFFFF\n" // P_n
+                                              // --- mul 1
+               "ld1d    z31.d, p7/z, %1\n"    // a0 (mul_1)
+               "ld1d    z30.d, p7/z, [%4]\n"  // b[0]
+#ifdef __SVE_512__
+               "ld1d    z10.d, p7/z, [%7]\n"
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -442,8 +462,11 @@ inline void Goldilocks::spmv_sve_4x12(svuint64_t &c, const svuint64_t &a0, const
                "cmphi   p6.d, p7/z, z23.d, z30.d\n"
                "add     z11.d, p6/m, z11.d, z22.d\n" // c0 (-> z11)
                // --- mul 2
-               "ld1d    z31.d, p7/z, %2\n"           // a1 (mul_2)
-               "ld1d    z30.d, p7/z, [%5]\n"         // b[4]
+               "ld1d    z31.d, p7/z, %2\n"   // a1 (mul_2)
+               "ld1d    z30.d, p7/z, [%5]\n" // b[4]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -474,8 +497,11 @@ inline void Goldilocks::spmv_sve_4x12(svuint64_t &c, const svuint64_t &a0, const
                "cmphi   p6.d, p7/z, z23.d, z30.d\n"
                "add     z12.d, p6/m, z12.d, z22.d\n" // c0 (c1 -> z12)
                // --- mul 3
-               "ld1d    z31.d, p7/z, %3\n"           // a2 (mul_3)
-               "ld1d    z30.d, p7/z, [%6]\n"         // b[8]
+               "ld1d    z31.d, p7/z, %3\n"   // a2 (mul_3)
+               "ld1d    z30.d, p7/z, [%6]\n" // b[8]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -518,7 +544,12 @@ inline void Goldilocks::spmv_sve_4x12(svuint64_t &c, const svuint64_t &a0, const
                "add     z11.d, p6/m, z11.d, z22.d\n"
                "st1d    z11.d, p7, %0\n"
                : "=m"(c)
-               : "m"(a0), "m"(a1), "m"(a2), "r"((uint64_t *)&b[0]), "r"((uint64_t *)&b[4]), "r"((uint64_t *)&b[8]));
+               : "m"(a0), "m"(a1), "m"(a2), "r"((uint64_t *)&bb[0]), "r"((uint64_t *)&bb[4]), "r"((uint64_t *)&bb[8])
+#ifdef __SVE_512__
+                                                                                                  ,
+                 "r"(idx)
+#endif
+    );
 #endif
 }
 
@@ -528,15 +559,31 @@ inline void Goldilocks::spmv_sve_4x12(svuint64_t &c, const svuint64_t &a0, const
 // We assume coeficients of b_8 can be expressed with 8 bits (<256)
 inline void Goldilocks::spmv_sve_4x12_8(svuint64_t &c, const svuint64_t &a0, const svuint64_t &a1, const svuint64_t &a2, const Goldilocks::Element b_8[12])
 {
+    uint64_t *bb = (uint64_t *)b_8;
+
+#ifdef __SVE_512__
+    uint64_t b24[16];
+    bb = b24;
+    memcpy(bb, b_8, 96);
+    uint64_t idx[8] = {8, 8, 8, 8, 0, 1, 2, 3};
+#endif
+
 #ifndef __USE_SVE_ASM__
     svuint64_t b0, b1, b2;
     svuint64_t c0_h, c1_h, c2_h;
     svuint64_t c0_l, c1_l, c2_l;
     svuint64_t c_h, c_l, aux_h, aux_l;
 
-    load_sve(b0, &(b_8[0]));
-    load_sve(b1, &(b_8[4]));
-    load_sve(b2, &(b_8[8]));
+    load_sve(b0, (Goldilocks::Element *)&(bb[0]));
+    load_sve(b1, (Goldilocks::Element *)&(bb[4]));
+    load_sve(b2, (Goldilocks::Element *)&(bb[8]));
+#ifdef __SVE_512__
+    svuint64_t vidx = svld1_u64(svptrue_b64(), idx);
+    b0 = svtbx_u64(b0, b0, vidx);
+    b1 = svtbx_u64(b1, b1, vidx);
+    b2 = svtbx_u64(b2, b2, vidx);
+#endif
+
     mult_sve_72(c0_h, c0_l, a0, b0);
     mult_sve_72(c1_h, c1_l, a1, b1);
     mult_sve_72(c2_h, c2_l, a2, b2);
@@ -552,6 +599,10 @@ inline void Goldilocks::spmv_sve_4x12_8(svuint64_t &c, const svuint64_t &a0, con
     asm inline("ptrue   p7.d, all\n"
                "ld1d    z31.d, p7/z, %1\n" // a0 (mul_1)
                "ld1d    z30.d, p7/z, [%4]\n"
+#ifdef __SVE_512__
+               "ld1d    z10.d, p7/z, [%7]\n"
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -565,6 +616,9 @@ inline void Goldilocks::spmv_sve_4x12_8(svuint64_t &c, const svuint64_t &a0, con
                "sel     z12.s, p15, z30.s, z31.s\n"  // c_l (c0_l -> z12)
                "ld1d    z31.d, p7/z, %2\n"           // a1  (mul_2)
                "ld1d    z30.d, p7/z, [%5]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -576,6 +630,9 @@ inline void Goldilocks::spmv_sve_4x12_8(svuint64_t &c, const svuint64_t &a0, con
                "sel     z14.s, p15, z30.s, z31.s\n"  // c_l (c1_l -> z14)
                "ld1d    z31.d, p7/z, %3\n"           // a2  (mul_3)
                "ld1d    z30.d, p7/z, [%6]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -606,13 +663,36 @@ inline void Goldilocks::spmv_sve_4x12_8(svuint64_t &c, const svuint64_t &a0, con
                "add     z12.d, p6/m, z12.d, z28.d\n"
                "st1d    z12.d, p7, %0\n"
                : "=m"(c)
-               : "m"(a0), "m"(a1), "m"(a2), "r"((uint64_t *)(&b_8[0])), "r"((uint64_t *)(&b_8[4])), "r"((uint64_t *)(&b_8[8])));
+               : "m"(a0), "m"(a1), "m"(a2), "r"((uint64_t *)(&bb[0])), "r"((uint64_t *)(&bb[4])), "r"((uint64_t *)(&bb[8]))
+#ifdef __SVE_512__
+                                                                                                      ,
+                 "r"(idx)
+#endif
+    );
 #endif
 }
 
 inline void Goldilocks::transpose(svuint64_t &r0, svuint64_t &r1, svuint64_t &r2, svuint64_t &r3,
                                   svuint64_t &c0, svuint64_t &c1, svuint64_t &c2, svuint64_t &c3)
 {
+#ifdef __SVE_512__
+    uint64_t idx1[8] = {8, 8, 0, 1, 8, 8, 4, 5};
+    uint64_t idx2[8] = {2, 3, 8, 8, 6, 7, 8, 8};
+    uint64_t idx3[8] = {8, 0, 8, 2, 8, 4, 8, 6};
+    uint64_t idx4[8] = {1, 8, 3, 8, 5, 8, 7, 8};
+    svuint64_t vidx1 = svld1_u64(svptrue_b64(), idx1);
+    svuint64_t vidx2 = svld1_u64(svptrue_b64(), idx2);
+    svuint64_t vidx3 = svld1_u64(svptrue_b64(), idx3);
+    svuint64_t vidx4 = svld1_u64(svptrue_b64(), idx4);
+    svuint64_t t0 = svtbx_u64(r0, r2, vidx1);
+    svuint64_t t1 = svtbx_u64(r1, r3, vidx1);
+    svuint64_t t2 = svtbx_u64(r2, r0, vidx2);
+    svuint64_t t3 = svtbx_u64(r3, r1, vidx2);
+    c0 = svtbx_u64(t0, t1, vidx3);
+    c1 = svtbx_u64(t1, t0, vidx4);
+    c2 = svtbx_u64(t2, t3, vidx3);
+    c3 = svtbx_u64(t3, t2, vidx4);
+#else
     svuint64_t t0 = svzip1_u64(r0, r2);
     svuint64_t t1 = svzip1_u64(r1, r3);
     svuint64_t t2 = svzip2_u64(r0, r2);
@@ -621,11 +701,13 @@ inline void Goldilocks::transpose(svuint64_t &r0, svuint64_t &r1, svuint64_t &r2
     c1 = svzip2_u64(t0, t1);
     c2 = svzip1_u64(t2, t3);
     c3 = svzip2_u64(t2, t3);
+#endif
 }
 
 // Dense matrix-vector product
 inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, const svuint64_t &a1, const svuint64_t &a2, const Goldilocks::Element M[48])
 {
+
 #ifndef __USE_SVE_ASM__
     // Generate matrix 4x4
     svuint64_t r0, r1, r2, r3;
@@ -644,13 +726,27 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
     add_sve(sum1, c2, c3);
     add_sve(b, sum0, sum1);
 #else
-    volatile uint64_t *mx = (uint64_t *)M;
+    uint64_t *mm = (uint64_t *)M;
+#ifdef __SVE_512__
+    uint64_t idx1[8] = {8, 8, 0, 1, 8, 8, 4, 5};
+    uint64_t idx2[8] = {2, 3, 8, 8, 6, 7, 8, 8};
+    uint64_t idx3[8] = {8, 0, 8, 2, 8, 4, 8, 6};
+    uint64_t idx4[8] = {1, 8, 3, 8, 5, 8, 7, 8};
+    uint64_t m52[52];
+    mm = m52;
+    memcpy(mm, M, 384);
+    uint64_t idx[8] = {8, 8, 8, 8, 0, 1, 2, 3};
+#endif
     asm inline("ptrue   p7.d, all\n"
                "mov     z22.d, #0xFFFFFFFF\n" // P_n
                // spmv_sve_4x12(r0, a0, a1, a2, &(M[0]));
                // --- mul 1
-               "ld1d    z31.d, p7/z, %1\n"           // a0 (mul_1)
-               "ld1d    z30.d, p7/z, [%4]\n"         // b[0]
+               "ld1d    z31.d, p7/z, %1\n"   // a0 (mul_1)
+               "ld1d    z30.d, p7/z, [%4]\n" // b[0]
+#ifdef __SVE_512__
+               "ld1d    z10.d, p7/z, [%20]\n"
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -683,8 +779,11 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "cmphi   p6.d, p7/z, z23.d, z30.d\n"
                "add     z11.d, p6/m, z11.d, z22.d\n" // c0 (-> z11)
                // --- mul 2
-               "ld1d    z31.d, p7/z, %2\n"           // a1 (mul_2)
-               "ld1d    z30.d, p7/z, [%5]\n"         // b[4]
+               "ld1d    z31.d, p7/z, %2\n"   // a1 (mul_2)
+               "ld1d    z30.d, p7/z, [%5]\n" // b[4]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -715,8 +814,11 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "cmphi   p6.d, p7/z, z23.d, z30.d\n"
                "add     z12.d, p6/m, z12.d, z22.d\n" // c0 (c1 -> z12)
                // --- mul 3
-               "ld1d    z31.d, p7/z, %3\n"           // a2 (mul_3)
-               "ld1d    z30.d, p7/z, [%6]\n"         // b[8]
+               "ld1d    z31.d, p7/z, %3\n"   // a2 (mul_3)
+               "ld1d    z30.d, p7/z, [%6]\n" // b[8]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -759,8 +861,11 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "add     z11.d, p6/m, z11.d, z22.d\n"
                "mov     z15.d, z11.d\n" // r0
                // *** spmv_sve_4x12(r1, a0, a1, a2, &(M[12]));
-               "ld1d    z31.d, p7/z, %1\n"           // a0 (mul_1)
-               "ld1d    z30.d, p7/z, [%7]\n"         // b[0]
+               "ld1d    z31.d, p7/z, %1\n"   // a0 (mul_1)
+               "ld1d    z30.d, p7/z, [%7]\n" // b[0]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -793,8 +898,11 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "cmphi   p6.d, p7/z, z23.d, z30.d\n"
                "add     z11.d, p6/m, z11.d, z22.d\n" // c0 (-> z11)
                // --- mul 2
-               "ld1d    z31.d, p7/z, %2\n"           // a1 (mul_2)
-               "ld1d    z30.d, p7/z, [%8]\n"         // b[4]
+               "ld1d    z31.d, p7/z, %2\n"   // a1 (mul_2)
+               "ld1d    z30.d, p7/z, [%8]\n" // b[4]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -825,8 +933,11 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "cmphi   p6.d, p7/z, z23.d, z30.d\n"
                "add     z12.d, p6/m, z12.d, z22.d\n" // c0 (c1 -> z12)
                // --- mul 3
-               "ld1d    z31.d, p7/z, %3\n"           // a2 (mul_3)
-               "ld1d    z30.d, p7/z, [%9]\n"         // b[8]
+               "ld1d    z31.d, p7/z, %3\n"   // a2 (mul_3)
+               "ld1d    z30.d, p7/z, [%9]\n" // b[8]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -869,8 +980,11 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "add     z11.d, p6/m, z11.d, z22.d\n"
                "mov     z16.d, z11.d\n" // r1
                // *** spmv_sve_4x12(r2, a0, a1, a2, &(M[24]));
-               "ld1d    z31.d, p7/z, %1\n"           // a0 (mul_1)
-               "ld1d    z30.d, p7/z, [%10]\n"        // b[0]
+               "ld1d    z31.d, p7/z, %1\n"    // a0 (mul_1)
+               "ld1d    z30.d, p7/z, [%10]\n" // b[0]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -903,8 +1017,11 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "cmphi   p6.d, p7/z, z23.d, z30.d\n"
                "add     z11.d, p6/m, z11.d, z22.d\n" // c0 (-> z11)
                // --- mul 2
-               "ld1d    z31.d, p7/z, %2\n"           // a1 (mul_2)
-               "ld1d    z30.d, p7/z, [%11]\n"        // b[4]
+               "ld1d    z31.d, p7/z, %2\n"    // a1 (mul_2)
+               "ld1d    z30.d, p7/z, [%11]\n" // b[4]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -935,8 +1052,11 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "cmphi   p6.d, p7/z, z23.d, z30.d\n"
                "add     z12.d, p6/m, z12.d, z22.d\n" // c0 (c1 -> z12)
                // --- mul 3
-               "ld1d    z31.d, p7/z, %3\n"           // a2 (mul_3)
-               "ld1d    z30.d, p7/z, [%12]\n"        // b[8]
+               "ld1d    z31.d, p7/z, %3\n"    // a2 (mul_3)
+               "ld1d    z30.d, p7/z, [%12]\n" // b[8]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -981,6 +1101,9 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                // *** spmv_sve_4x12(r3, a0, a1, a2, &(M[36]));
                "ld1d    z31.d, p7/z, %1\n"           // a0 (mul_1)
                "ld1d    z30.d, p7/z, [%13]\n"        // b[0]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -1013,8 +1136,11 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "cmphi   p6.d, p7/z, z23.d, z30.d\n"
                "add     z11.d, p6/m, z11.d, z22.d\n" // c0 (-> z11)
                // --- mul 2
-               "ld1d    z31.d, p7/z, %2\n"           // a1 (mul_2)
-               "ld1d    z30.d, p7/z, [%14]\n"        // b[4]
+               "ld1d    z31.d, p7/z, %2\n"    // a1 (mul_2)
+               "ld1d    z30.d, p7/z, [%14]\n" // b[4]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -1045,8 +1171,11 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "cmphi   p6.d, p7/z, z23.d, z30.d\n"
                "add     z12.d, p6/m, z12.d, z22.d\n" // c0 (c1 -> z12)
                // --- mul 3
-               "ld1d    z31.d, p7/z, %3\n"           // a2 (mul_3)
-               "ld1d    z30.d, p7/z, [%15]\n"        // b[8]
+               "ld1d    z31.d, p7/z, %3\n"    // a2 (mul_3)
+               "ld1d    z30.d, p7/z, [%15]\n" // b[8]
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "lsr     z28.d, z30.d, #32\n"         // b_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
@@ -1089,14 +1218,33 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "add     z11.d, p6/m, z11.d, z22.d\n"
                "mov     z18.d, z11.d\n" // r3
                // *** transpose
-               "zip1    z10.d, z15.d, z17.d\n"
-               "zip1    z11.d, z16.d, z18.d\n"
-               "zip2    z12.d, z15.d, z17.d\n"
-               "zip2    z13.d, z16.d, z18.d\n"
+#ifdef __SVE_512__
+               "ld1d    z11.d, p7/z, [%16]\n" // idx1
+               "ld1d    z12.d, p7/z, [%17]\n" // idx2
+               "ld1d    z13.d, p7/z, [%18]\n" // idx3
+               "ld1d    z14.d, p7/z, [%19]\n" // idx4
+               "mov     z19.d, z15.d\n"
+               "mov     z20.d, z16.d\n"
+               "tbx     z15.d, z17.d, z11.d\n" // t0
+               "tbx     z16.d, z18.d, z11.d\n" // t1
+               "tbx     z17.d, z19.d, z12.d\n" // t2
+               "tbx     z18.d, z20.d, z12.d\n" // t3
+               "mov     z19.d, z15.d\n"
+               "mov     z20.d, z17.d\n"
+               "tbx     z15.d, z16.d, z13.d\n" // c0
+               "tbx     z16.d, z19.d, z14.d\n" // c1
+               "tbx     z17.d, z18.d, z13.d\n" // c2
+               "tbx     z18.d, z20.d, z14.d\n" // c3
+#else
+               "zip1    z10.d, z15.d, z17.d\n" // t0
+               "zip1    z11.d, z16.d, z18.d\n" // t1
+               "zip2    z12.d, z15.d, z17.d\n" // t2
+               "zip2    z13.d, z16.d, z18.d\n" // t3
                "zip1    z15.d, z10.d, z11.d\n" // c0
                "zip2    z16.d, z10.d, z11.d\n" // c1
                "zip1    z17.d, z12.d, z13.d\n" // c2
                "zip2    z18.d, z12.d, z13.d\n" // c3
+#endif
                // add
                "mov     z30.d, #-4294967295\n"
                "sub     z30.d, z30.d, z15.d\n"
@@ -1115,7 +1263,12 @@ inline void Goldilocks::mmult_sve_4x12(svuint64_t &b, const svuint64_t &a0, cons
                "add     z15.d, p6/m, z15.d, z22.d\n" // result
                "st1d    z15.d, p7, %0\n"
                : "=m"(b)
-               : "m"(a0), "m"(a1), "m"(a2), "r"((uint64_t *)&M[0]), "r"((uint64_t *)&M[4]), "r"((uint64_t *)&M[8]), "r"((uint64_t *)&M[12]), "r"((uint64_t *)&M[16]), "r"((uint64_t *)&M[20]), "r"((uint64_t *)&M[24]), "r"((uint64_t *)&M[28]), "r"((uint64_t *)&M[32]), "r"((uint64_t *)&M[36]), "r"((uint64_t *)&M[40]), "r"((uint64_t *)&M[44]));
+               : "m"(a0), "m"(a1), "m"(a2), "r"((uint64_t *)&mm[0]), "r"((uint64_t *)&mm[4]), "r"((uint64_t *)&mm[8]), "r"((uint64_t *)&mm[12]), "r"((uint64_t *)&mm[16]), "r"((uint64_t *)&mm[20]), "r"((uint64_t *)&mm[24]), "r"((uint64_t *)&mm[28]), "r"((uint64_t *)&mm[32]), "r"((uint64_t *)&mm[36]), "r"((uint64_t *)&mm[40]), "r"((uint64_t *)&mm[44])
+#ifdef __SVE_512__
+                                                                                                                                                                                                                                                                                                                                           ,
+                 "r"(idx1), "r"(idx2), "r"(idx3), "r"(idx4), "r"(idx)
+#endif
+    );
 #endif // __USE_SVE_ASM__
 }
 
@@ -1141,11 +1294,26 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
     add_sve(sum1, c2, c3);
     add_sve(b, sum0, sum1);
 #else
+    uint64_t *mm = (uint64_t *)M_8;
+#ifdef __SVE_512__
+    uint64_t idx1[8] = {8, 8, 0, 1, 8, 8, 4, 5};
+    uint64_t idx2[8] = {2, 3, 8, 8, 6, 7, 8, 8};
+    uint64_t idx3[8] = {8, 0, 8, 2, 8, 4, 8, 6};
+    uint64_t idx4[8] = {1, 8, 3, 8, 5, 8, 7, 8};
+    uint64_t m52[52];
+    mm = m52;
+    memcpy(mm, M_8, 384);
+    uint64_t idx[8] = {8, 8, 8, 8, 0, 1, 2, 3};
+#endif
     asm inline("ptrue   p7.d, all\n"
-               "mov     z22.d, #4294967295\n"       // P_n
-                // *** spmv_sve_4x12_8(r0, a0, a1, a2, &(M_8[0]));
-               "ld1d    z31.d, p7/z, %1\n" // a0 (mul_1)
+               "mov     z22.d, #4294967295\n" // P_n
+                                              // *** spmv_sve_4x12_8(r0, a0, a1, a2, &(M_8[0]));
+               "ld1d    z31.d, p7/z, %1\n"    // a0 (mul_1)
                "ld1d    z30.d, p7/z, [%4]\n"
+#ifdef __SVE_512__
+               "ld1d    z10.d, p7/z, [%20]\n"
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1159,6 +1327,9 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "sel     z12.s, p15, z30.s, z31.s\n"  // c_l (c0_l -> z12)
                "ld1d    z31.d, p7/z, %2\n"           // a1  (mul_2)
                "ld1d    z30.d, p7/z, [%5]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1170,6 +1341,9 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "sel     z14.s, p15, z30.s, z31.s\n"  // c_l (c1_l -> z14)
                "ld1d    z31.d, p7/z, %3\n"           // a2  (mul_3)
                "ld1d    z30.d, p7/z, [%6]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1197,10 +1371,13 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "add     z12.d, z11.d, z12.d\n"
                "cmphi   p6.d, p7/z, z11.d, z30.d\n"
                "add     z12.d, p6/m, z12.d, z22.d\n"
-               "mov     z17.d, z12.d\n"             // r0
+               "mov     z17.d, z12.d\n" // r0
                // *** spmv_sve_4x12_8(r1, a0, a1, a2, &(M_8[12]));
                "ld1d    z31.d, p7/z, %1\n" // a0 (mul_1)
                "ld1d    z30.d, p7/z, [%7]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1211,9 +1388,12 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "lsr     z11.d, z29.d, #32\n"         // c_h (c0_h -> z11)
                // "ptrue   p15.s, all\n"
                // "eor     p15.b, p15/z, p7.b, p15.b\n" // sel
-               "sel     z12.s, p15, z30.s, z31.s\n"  // c_l (c0_l -> z12)
-               "ld1d    z31.d, p7/z, %2\n"           // a1  (mul_2)
+               "sel     z12.s, p15, z30.s, z31.s\n" // c_l (c0_l -> z12)
+               "ld1d    z31.d, p7/z, %2\n"          // a1  (mul_2)
                "ld1d    z30.d, p7/z, [%8]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1225,6 +1405,9 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "sel     z14.s, p15, z30.s, z31.s\n"  // c_l (c1_l -> z14)
                "ld1d    z31.d, p7/z, %3\n"           // a2  (mul_3)
                "ld1d    z30.d, p7/z, [%9]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1234,7 +1417,7 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "lsl     z30.d, z29.d, #32\n"         // r0_l
                "lsr     z15.d, z29.d, #32\n"         // c_h (c2_h -> z15)
                "sel     z16.s, p15, z30.s, z31.s\n"  // c_l (c2_l -> z16)
-               "mov     z30.d, #-4294967295\n"      // add_sve (z12 + z14)
+               "mov     z30.d, #-4294967295\n"       // add_sve (z12 + z14)
                "sub     z30.d, z30.d, z12.d\n"
                "add     z12.d, z14.d, z12.d\n"
                "cmphi   p6.d, p7/z, z14.d, z30.d\n"
@@ -1252,10 +1435,13 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "add     z12.d, z11.d, z12.d\n"
                "cmphi   p6.d, p7/z, z11.d, z30.d\n"
                "add     z12.d, p6/m, z12.d, z22.d\n"
-               "mov     z18.d, z12.d\n"             // r1
-               // ***
+               "mov     z18.d, z12.d\n" // r1
+               // *** spmv_sve_4x12_8(r2, a0, a1, a2, &(M_8[24]));
                "ld1d    z31.d, p7/z, %1\n" // a0 (mul_1)
                "ld1d    z30.d, p7/z, [%10]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1266,9 +1452,12 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "lsr     z11.d, z29.d, #32\n"         // c_h (c0_h -> z11)
                // "ptrue   p15.s, all\n"
                // "eor     p15.b, p15/z, p7.b, p15.b\n" // sel
-               "sel     z12.s, p15, z30.s, z31.s\n"  // c_l (c0_l -> z12)
-               "ld1d    z31.d, p7/z, %2\n"           // a1  (mul_2)
+               "sel     z12.s, p15, z30.s, z31.s\n" // c_l (c0_l -> z12)
+               "ld1d    z31.d, p7/z, %2\n"          // a1  (mul_2)
                "ld1d    z30.d, p7/z, [%11]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1280,6 +1469,9 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "sel     z14.s, p15, z30.s, z31.s\n"  // c_l (c1_l -> z14)
                "ld1d    z31.d, p7/z, %3\n"           // a2  (mul_3)
                "ld1d    z30.d, p7/z, [%12]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1289,7 +1481,7 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "lsl     z30.d, z29.d, #32\n"         // r0_l
                "lsr     z15.d, z29.d, #32\n"         // c_h (c2_h -> z15)
                "sel     z16.s, p15, z30.s, z31.s\n"  // c_l (c2_l -> z16)
-               "mov     z30.d, #-4294967295\n"      // add_sve (z12 + z14)
+               "mov     z30.d, #-4294967295\n"       // add_sve (z12 + z14)
                "sub     z30.d, z30.d, z12.d\n"
                "add     z12.d, z14.d, z12.d\n"
                "cmphi   p6.d, p7/z, z14.d, z30.d\n"
@@ -1307,10 +1499,13 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "add     z12.d, z11.d, z12.d\n"
                "cmphi   p6.d, p7/z, z11.d, z30.d\n"
                "add     z12.d, p6/m, z12.d, z22.d\n"
-               "mov     z19.d, z12.d\n"             // r2
-               // ***
+               "mov     z19.d, z12.d\n" // r2
+               // *** spmv_sve_4x12_8(r3, a0, a1, a2, &(M_8[36]));
                "ld1d    z31.d, p7/z, %1\n" // a0 (mul_1)
                "ld1d    z30.d, p7/z, [%13]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1321,9 +1516,12 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "lsr     z11.d, z29.d, #32\n"         // c_h (c0_h -> z11)
                // "ptrue   p15.s, all\n"
                // "eor     p15.b, p15/z, p7.b, p15.b\n" // sel
-               "sel     z12.s, p15, z30.s, z31.s\n"  // c_l (c0_l -> z12)
-               "ld1d    z31.d, p7/z, %2\n"           // a1  (mul_2)
+               "sel     z12.s, p15, z30.s, z31.s\n" // c_l (c0_l -> z12)
+               "ld1d    z31.d, p7/z, %2\n"          // a1  (mul_2)
                "ld1d    z30.d, p7/z, [%14]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1335,6 +1533,9 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "sel     z14.s, p15, z30.s, z31.s\n"  // c_l (c1_l -> z14)
                "ld1d    z31.d, p7/z, %3\n"           // a2  (mul_3)
                "ld1d    z30.d, p7/z, [%15]\n"
+#ifdef __SVE_512__
+               "tbx     z30.d, z30.d, z10.d\n"
+#endif
                "lsr     z29.d, z31.d, #32\n"         // a_h
                "and     z31.d, z31.d, #0xFFFFFFFF\n" // a_l
                "and     z30.d, z30.d, #0xFFFFFFFF\n" // b_l
@@ -1344,7 +1545,7 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "lsl     z30.d, z29.d, #32\n"         // r0_l
                "lsr     z15.d, z29.d, #32\n"         // c_h (c2_h -> z15)
                "sel     z16.s, p15, z30.s, z31.s\n"  // c_l (c2_l -> z16)
-               "mov     z30.d, #-4294967295\n"      // add_sve (z12 + z14)
+               "mov     z30.d, #-4294967295\n"       // add_sve (z12 + z14)
                "sub     z30.d, z30.d, z12.d\n"
                "add     z12.d, z14.d, z12.d\n"
                "cmphi   p6.d, p7/z, z14.d, z30.d\n"
@@ -1362,16 +1563,36 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "add     z12.d, z11.d, z12.d\n"
                "cmphi   p6.d, p7/z, z11.d, z30.d\n"
                "add     z12.d, p6/m, z12.d, z22.d\n"
-               "mov     z20.d, z12.d\n"             // r3
+               "mov     z20.d, z12.d\n" // r3
                // *** transpose
-               "zip1    z10.d, z17.d, z19.d\n"
-               "zip1    z11.d, z18.d, z20.d\n"
-               "zip2    z12.d, z17.d, z19.d\n"
-               "zip2    z13.d, z18.d, z20.d\n"
+#ifdef __SVE_512__
+               "ld1d    z11.d, p7/z, [%16]\n" // idx1
+               "ld1d    z12.d, p7/z, [%17]\n" // idx2
+               "ld1d    z13.d, p7/z, [%18]\n" // idx3
+               "ld1d    z14.d, p7/z, [%19]\n" // idx4
+               "mov     z15.d, z17.d\n"
+               "mov     z16.d, z18.d\n"
+               "tbx     z15.d, z19.d, z11.d\n" // t0
+               "tbx     z16.d, z20.d, z11.d\n" // t1
+               "tbx     z19.d, z17.d, z12.d\n" // t2
+               "tbx     z20.d, z18.d, z12.d\n" // t3
+               "mov     z17.d, z19.d\n"
+               "mov     z18.d, z20.d\n"
+               "mov     z10.d, z15.d\n"
+               "tbx     z15.d, z16.d, z13.d\n" // c0
+               "tbx     z16.d, z10.d, z14.d\n" // c1
+               "tbx     z17.d, z18.d, z13.d\n" // c2
+               "tbx     z18.d, z19.d, z14.d\n" // c3
+#else
+               "zip1    z10.d, z17.d, z19.d\n" // t0
+               "zip1    z11.d, z18.d, z20.d\n" // t1
+               "zip2    z12.d, z17.d, z19.d\n" // t2
+               "zip2    z13.d, z18.d, z20.d\n" // t3
                "zip1    z15.d, z10.d, z11.d\n" // c0
                "zip2    z16.d, z10.d, z11.d\n" // c1
                "zip1    z17.d, z12.d, z13.d\n" // c2
                "zip2    z18.d, z12.d, z13.d\n" // c3
+#endif
                // add
                "mov     z30.d, #-4294967295\n"
                "sub     z30.d, z30.d, z15.d\n"
@@ -1390,7 +1611,12 @@ inline void Goldilocks::mmult_sve_4x12_8(svuint64_t &b, const svuint64_t &a0, co
                "add     z15.d, p6/m, z15.d, z22.d\n" // result
                "st1d    z15.d, p7, %0\n"
                : "=m"(b)
-               : "m"(a0), "m"(a1), "m"(a2), "r"((uint64_t *)&M_8[0]), "r"((uint64_t *)&M_8[4]), "r"((uint64_t *)&M_8[8]), "r"((uint64_t *)&M_8[12]), "r"((uint64_t *)&M_8[16]), "r"((uint64_t *)&M_8[20]), "r"((uint64_t *)&M_8[24]), "r"((uint64_t *)&M_8[28]), "r"((uint64_t *)&M_8[32]), "r"((uint64_t *)&M_8[36]), "r"((uint64_t *)&M_8[40]), "r"((uint64_t *)&M_8[44]));
+               : "m"(a0), "m"(a1), "m"(a2), "r"((uint64_t *)&mm[0]), "r"((uint64_t *)&mm[4]), "r"((uint64_t *)&mm[8]), "r"((uint64_t *)&mm[12]), "r"((uint64_t *)&mm[16]), "r"((uint64_t *)&mm[20]), "r"((uint64_t *)&mm[24]), "r"((uint64_t *)&mm[28]), "r"((uint64_t *)&mm[32]), "r"((uint64_t *)&mm[36]), "r"((uint64_t *)&mm[40]), "r"((uint64_t *)&mm[44])
+#ifdef __SVE_512__
+                                                                                                                                                                                                                                                                                                                                           ,
+                 "r"(idx1), "r"(idx2), "r"(idx3), "r"(idx4), "r"(idx)
+#endif
+               );
 #endif // __USE_SVE_ASM__
 }
 
