@@ -60,7 +60,7 @@ Goldilocks::Element *const_data(size_t total_elem)
 void run()
 {
     uint64_t ncols = 8;
-    uint64_t nrows = (1 << 20);
+    uint64_t nrows = (1 << 22);
 
     Goldilocks::Element* leaves = const_data(ncols * nrows);
 
