@@ -1,6 +1,7 @@
 #ifndef GOLDILOCKS_SCALAR
 #define GOLDILOCKS_SCALAR
 #include "goldilocks_base_field.hpp"
+#include <cassert>
 
 inline void Goldilocks::copy(Element &dst, const Element &src) { dst.fe = src.fe; };
 
@@ -15,6 +16,9 @@ inline Goldilocks::Element Goldilocks::add(const Element &in1, const Element &in
 
 inline void Goldilocks::add(Element &result, const Element &in1, const Element &in2)
 {
+#ifdef __aarch64__
+    assert(false);
+#else
     uint64_t in_1 = in1.fe;
     uint64_t in_2 = in2.fe;
     __asm__("xor   %%r10, %%r10\n\t"
@@ -28,6 +32,7 @@ inline void Goldilocks::add(Element &result, const Element &in1, const Element &
             : "=&a"(result.fe)
             : "r"(in_1), "r"(in_2), "m"(CQ), "m"(ZR)
             : "%r10");
+#endif
 
 #if GOLDILOCKS_DEBUG == 1 && USE_MONTGOMERY == 0
     result.fe = result.fe % GOLDILOCKS_PRIME;
@@ -61,6 +66,9 @@ inline Goldilocks::Element Goldilocks::sub(const Element &in1, const Element &in
 
 inline void Goldilocks::sub(Element &result, const Element &in1, const Element &in2)
 {
+#ifdef __aarch64__
+    assert(false);
+#else
     uint64_t in_1 = in1.fe;
     uint64_t in_2 = in2.fe;
     __asm__("xor   %%r10, %%r10\n\t"
@@ -74,6 +82,7 @@ inline void Goldilocks::sub(Element &result, const Element &in1, const Element &
             : "=&a"(result.fe)
             : "r"(in_1), "r"(in_2), "m"(CQ), "m"(ZR)
             : "%r10");
+#endif
 #if GOLDILOCKS_DEBUG == 1 && USE_MONTGOMERY == 0
     result.fe = result.fe % GOLDILOCKS_PRIME;
 #endif
@@ -102,6 +111,9 @@ inline Goldilocks::Element Goldilocks::mul(const Element &in1, const Element &in
 
 inline void Goldilocks::mul(Element &result, const Element &in1, const Element &in2)
 {
+#ifdef __aarch64__
+    assert(false);
+#else
 #if USE_MONTGOMERY == 1
     __asm__("xor   %%r10, %%r10\n\t"
             "mov   %1, %%rax\n\t"
@@ -154,6 +166,7 @@ inline void Goldilocks::mul(Element &result, const Element &in1, const Element &
             : "%rbx", "%rcx", "%rdx");
 
 #endif
+#endif
 #if GOLDILOCKS_DEBUG == 1 && USE_MONTGOMERY == 0
     result.fe = result.fe % GOLDILOCKS_PRIME;
 #endif
@@ -161,6 +174,9 @@ inline void Goldilocks::mul(Element &result, const Element &in1, const Element &
 
 inline void Goldilocks::mul2(Element &result, const Element &in1, const Element &in2)
 {
+#ifdef __aarch64__
+    assert(false);
+#else
 #if USE_MONTGOMERY == 1
     __asm__("xor   %%r10, %%r10\n\t"
             "mov   %1, %%rax\n\t"
@@ -184,6 +200,7 @@ inline void Goldilocks::mul2(Element &result, const Element &in1, const Element 
         : "=&d"(result.fe)
         : "r"(in1.fe), "r"(in2.fe), "m"(Q)
         : "%rax");
+#endif
 #endif
 #if GOLDILOCKS_DEBUG == 1 && USE_MONTGOMERY == 0
     result.fe = result.fe % GOLDILOCKS_PRIME;

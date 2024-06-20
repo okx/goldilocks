@@ -3,9 +3,11 @@
 
 #include <stdint.h> // for uint64_t
 #include "goldilocks_base_field.hpp"
-#include <immintrin.h>
 #include <cassert>
 #include <vector>
+#if defined(__AVX512__) || defined(__AVX256__)
+#include <immintrin.h>
+#endif
 
 #define FIELD_EXTENSION 3
 
@@ -19,8 +21,13 @@ class Goldilocks3
 {
 public:
     typedef Goldilocks::Element Element[FIELD_EXTENSION];
+#ifdef __AVX256__
     typedef __m256i Element_avx[FIELD_EXTENSION];
+#endif
+#ifdef __AVX512__
     typedef __m512i Element_avx512[FIELD_EXTENSION];
+#endif
+
 
 private:
     static const Element ZERO;
@@ -75,6 +82,7 @@ public:
             Goldilocks::copy(dst[i], src[i]);
         }
     };
+#ifdef __AVX256__
     static void copy_avx(Goldilocks::Element *dst, const __m256i a0_, const __m256i a1_, const __m256i a2_)
     {
         Goldilocks::Element buff0[4], buff1[4], buff2[4];
@@ -88,6 +96,7 @@ public:
             Goldilocks::copy(dst[k * FIELD_EXTENSION + 2], buff2[k]);
         }
     };
+#endif
 
     static inline void fromU64(Element &result, uint64_t in1[FIELD_EXTENSION])
     {
@@ -296,6 +305,7 @@ public:
         }
     }
 
+#ifdef __AVX256__
     static inline void add_avx(Goldilocks::Element *result, const Goldilocks::Element *a, const Goldilocks::Element *b)
     {
 
@@ -942,6 +952,7 @@ public:
         Goldilocks::add_avx(c1_, a1_, b1_);
         Goldilocks::add_avx(c2_, a2_, b2_);
     }
+#endif
 
 #ifdef __AVX512__
     static inline void add13_avx512(Goldilocks3::Element_avx512 c_, const __m512i &a_, Goldilocks3::Element_avx512 b_)
@@ -1406,6 +1417,7 @@ public:
         }
     }
 
+#ifdef __AVX256__
     static inline void sub33c_avx(Goldilocks::Element *result, Goldilocks::Element *a, Goldilocks::Element *b, uint64_t stride_a)
     {
 
@@ -1718,6 +1730,7 @@ public:
         Goldilocks::sub_avx(c1_, a1_, b1_);
         Goldilocks::sub_avx(c2_, a2_, b2_);
     }
+#endif
 
 #ifdef __AVX512__
     static inline void sub31c_avx512(Goldilocks3::Element_avx512 &c_, Goldilocks::Element *a, Goldilocks::Element b, uint64_t stride_a)
@@ -2089,7 +2102,7 @@ public:
             result[k * FIELD_EXTENSION + 2] = a[stride_a[k]] * b[stride_b[k] + 2];
         }
     }
-
+#ifdef __AVX256__
     static inline void mul13c_avx(Goldilocks::Element *result, Goldilocks::Element *a, Element &b, uint64_t stride_a)
     {
         Goldilocks::Element aa[12];
@@ -3469,6 +3482,7 @@ public:
         Goldilocks::sub_avx(c1_, result1_, auxr_);
         Goldilocks::sub_avx(c2_, B_, G_);
     };
+#endif
 
 #ifdef __AVX512__
     static inline void mul13c_avx512(Goldilocks3::Element_avx512 &c_, const __m512i &a_, Goldilocks::Element *b)

@@ -6,7 +6,9 @@
 #include <gmpxx.h>
 #include <iostream> // string
 #include <omp.h>
+#if defined(__AVX512__) || defined(__AVX256__)
 #include <immintrin.h>
+#endif
 
 #define USE_MONTGOMERY 0
 #define GOLDILOCKS_DEBUG 0
@@ -164,6 +166,7 @@ public:
     /*
         AVX operations
     */
+#ifdef __AVX256__
     static void set_avx(__m256i &a, const Goldilocks::Element &a3, const Goldilocks::Element &a2, const Goldilocks::Element &a1, const Goldilocks::Element &a0);
     static void load_avx(__m256i &a, const Goldilocks::Element *a4);
     static void load_avx_a(__m256i &a, const Goldilocks::Element *a4_a);
@@ -298,7 +301,7 @@ public:
     static void mul_avx(Element *c, uint64_t offset_c[4], const __m256i &a_, const Element *b, uint64_t offset_b);
     static void mul_avx(Element *c, uint64_t offset_c[4], const Element *a4, const __m256i &b_, const uint64_t offset_a[4]);
     static void mul_avx(Element *c, uint64_t offset_c[4], const Element *a, const Element *b, const uint64_t offset_a[4], const uint64_t offset_b[4]);
-    
+#endif
 
     /*
         AVX512 operations
@@ -439,7 +442,9 @@ inline Goldilocks::Element operator+(const Goldilocks::Element &in1) { return in
 #include "goldilocks_base_field_tools.hpp"
 #include "goldilocks_base_field_scalar.hpp"
 #include "goldilocks_base_field_batch.hpp"
+#ifdef __AVX256__
 #include "goldilocks_base_field_avx.hpp"
+#endif
 #ifdef __AVX512__
 #include "goldilocks_base_field_avx512.hpp"
 #endif
